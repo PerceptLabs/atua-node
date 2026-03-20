@@ -14,6 +14,7 @@ export class ModuleRouter {
 
     initializer.onReady(() => {
       this._state = 'enhanced';
+      this._hotSwapModules();
       this._emit('wasmer:ready');
     });
 
@@ -85,6 +86,33 @@ export class ModuleRouter {
     } else {
       this._eventListeners.set(event, [listener]);
     }
+  }
+
+  /**
+   * Hot-swap: atomically upgrade wasix-class modules from baseImpl to wasixImpl.
+   * Per-module fallback: if a specific module fails, it stays on baseImpl.
+   */
+  private _hotSwapModules(): void {
+    for (const [name, entry] of this._registry) {
+      if (entry.fidelityClass !== 'wasix' && entry.fidelityClass !== 'wasix-required') continue;
+      if (!entry.wasixImpl || !entry.loaded) continue;
+
+      try {
+        // Verify the wasixImpl is callable
+        entry.wasixImpl();
+        this._emit('module:upgraded', { name, provider: entry.provider });
+      } catch (err) {
+        // Per-module fallback: this module stays on baseImpl
+        entry.loaded = false;
+        entry.wasixImpl = null;
+        this._emit('module:upgrade-failed', { name, error: err });
+      }
+    }
+  }
+
+  /** Get a registry entry (for testing/inspection) */
+  getEntry(name: string): ModuleRegistryEntry | undefined {
+    return this._registry.get(name);
   }
 
   private _emit(event: string, ...args: unknown[]): void {

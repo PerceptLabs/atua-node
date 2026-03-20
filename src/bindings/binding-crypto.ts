@@ -46,7 +46,8 @@ export interface LibCryptoExports {
   EVP_DigestInit_ex(ctx: WasmPtr, md: WasmPtr, engine: WasmPtr): number;
   EVP_DigestUpdate(ctx: WasmPtr, data: WasmPtr, len: number): number;
   EVP_DigestFinal_ex(ctx: WasmPtr, out: WasmPtr, outLen: WasmPtr): number;
-  EVP_MD_CTX_size(ctx: WasmPtr): number;
+  EVP_MD_CTX_get0_md(ctx: WasmPtr): WasmPtr;
+  EVP_MD_get_size(md: WasmPtr): number;
 
   // Hash lookup
   EVP_sha256(): WasmPtr;
@@ -72,13 +73,16 @@ export interface LibCryptoExports {
   DH_size(dh: WasmPtr): number;
   DH_get0_pub_key(dh: WasmPtr): WasmPtr;
   DH_get0_priv_key(dh: WasmPtr): WasmPtr;
-  BN_num_bytes(bn: WasmPtr): number;
+  BN_num_bits(bn: WasmPtr): number;
   BN_bn2bin(bn: WasmPtr, out: WasmPtr): number;
   BN_bin2bn(data: WasmPtr, len: number, ret: WasmPtr): WasmPtr;
   DH_set0_pqg(dh: WasmPtr, p: WasmPtr, q: WasmPtr, g: WasmPtr): number;
 
   // RAND
   RAND_bytes(buf: WasmPtr, num: number): number;
+
+  // Provider management (OpenSSL 3.x)
+  OSSL_PROVIDER_load(libctx: WasmPtr, name: WasmPtr): WasmPtr;
 
   // Error handling
   ERR_get_error(): number;
@@ -310,7 +314,8 @@ export class HashContext {
 
   digest(): Uint8Array {
     this._checkFreed();
-    const size = this._exports.EVP_MD_CTX_size(this._ctx);
+    const md = this._exports.EVP_MD_CTX_get0_md(this._ctx);
+    const size = this._exports.EVP_MD_get_size(md);
     const outPtr = this._exports.malloc(size);
     const outLenPtr = this._exports.malloc(4);
 
@@ -458,7 +463,7 @@ export class DHContext {
   getPublicKey(): Uint8Array {
     this._checkFreed();
     const pubBn = this._exports.DH_get0_pub_key(this._dh);
-    const size = this._exports.BN_num_bytes(pubBn);
+    const size = Math.floor((this._exports.BN_num_bits(pubBn) + 7) / 8);
     const outPtr = this._exports.malloc(size);
     this._exports.BN_bn2bin(pubBn, outPtr);
     const result = readFromWasm(this._exports, outPtr, size);
@@ -523,6 +528,19 @@ export class BindingCrypto {
   init(exports: LibCryptoExports): void {
     this._exports = exports;
     this._scratch.init(exports);
+
+    // Load both default and legacy providers for OpenSSL 3.x.
+    // Loading one explicitly disables auto-load of the default provider,
+    // so both must be loaded for legacy ciphers (DES, RC4, BF) to work.
+    if (exports.OSSL_PROVIDER_load) {
+      const defaultName = writeToWasm(exports, new TextEncoder().encode('default\0'));
+      exports.OSSL_PROVIDER_load(0, defaultName);
+      exports.free(defaultName);
+
+      const legacyName = writeToWasm(exports, new TextEncoder().encode('legacy\0'));
+      exports.OSSL_PROVIDER_load(0, legacyName);
+      exports.free(legacyName);
+    }
   }
 
   get isReady(): boolean {

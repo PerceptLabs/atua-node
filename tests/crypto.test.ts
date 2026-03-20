@@ -146,7 +146,8 @@ function createMockLibCryptoExports(): LibCryptoExports {
       new Int32Array(memoryBuffer, outLenPtr, 1)[0] = 32;
       return 1;
     },
-    EVP_MD_CTX_size: () => 32,
+    EVP_MD_CTX_get0_md: () => 10, // returns a mock MD pointer
+    EVP_MD_get_size: () => 32,
 
     // Hash lookup
     EVP_sha256: () => 10,
@@ -244,9 +245,9 @@ function createMockLibCryptoExports(): LibCryptoExports {
       new Uint8Array(memoryBuffer, ptr, state.privKey.length).set(state.privKey);
       return ptr;
     },
-    BN_num_bytes(bn): number {
-      // In our mock, the BN pointer IS the data pointer
-      return 32;
+    BN_num_bits(bn): number {
+      // In our mock, all BNs are 256 bits (32 bytes)
+      return 256;
     },
     BN_bn2bin(bn, outPtr): number {
       const data = new Uint8Array(memoryBuffer, bn, 32);

@@ -25,3 +25,18 @@ These are frozen checkpoints. Never switch to them. Keep working on main.
 - Branch: `snapshot-<TODAY>-shell-improvements`
 - Push it
 - Stay on main
+
+## No Lazy Stubs
+
+- Stubs returning zero/ENOSYS are bugs if user code observes the value via `process.*`/`os.*`/any Node API
+- Return `UV_ENOSYS` ONLY when the capability is genuinely handled by a TypeScript bridge (net-bridge, proc-bridge, thread-bridge)
+- For POSIX functions wasix-libc declares but doesn't implement, write **real fallback code** (e.g., `readv` → loop over `read()`, `pipe2` → `pipe()` + `fcntl()`)
+- Platform query functions must return sensible real values, not zeros
+
+## No Lazy Implementations
+
+- No TODO comments that ship
+- No mocking what can be real
+- No skipping error handling
+- When compilation fails, fix the specific error — don't preemptively stub everything
+- Every function either works correctly or returns a documented error for a documented reason

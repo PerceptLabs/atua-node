@@ -67,7 +67,38 @@ export async function loadReactor(
 
   const wasmBytes = await readFile(wasmPath(name));
   const module = await WebAssembly.compile(wasmBytes);
-  const instance = await WebAssembly.instantiate(module, wasi.getImportObject());
+
+  // Build import object from WASI + any extra modules the WASM needs
+  const imports = WebAssembly.Module.imports(module);
+  const importObject: Record<string, Record<string, unknown>> = wasi.getImportObject() as any;
+
+  // Provide env.memory (shared memory for pthread-enabled modules like libuv)
+  const needsEnvMemory = imports.some(
+    (i) => i.module === 'env' && i.name === 'memory' && i.kind === 'memory'
+  );
+  if (needsEnvMemory) {
+    // Match the module's declared maximum memory (check imports for the declared max)
+    const memImport = imports.find(i => i.module === 'env' && i.name === 'memory');
+    const memory = new WebAssembly.Memory({ initial: 3, maximum: 3, shared: true });
+    importObject.env = { ...importObject.env, memory };
+  }
+
+  // Provide stubs for any non-WASI import modules (wasix_32v1, wasi, etc.)
+  // These are called by wasix-libc internals for threading/sockets/etc.
+  // We provide no-op stubs since Node.js WASI only supports wasi_snapshot_preview1.
+  const noop = () => 0;
+  for (const imp of imports) {
+    if (imp.module === 'wasi_snapshot_preview1') continue; // handled by node:wasi
+    if (imp.module === 'env') continue; // handled above
+    if (!importObject[imp.module]) {
+      importObject[imp.module] = {};
+    }
+    if (imp.kind === 'function' && !(imp.name in (importObject[imp.module] as any))) {
+      (importObject[imp.module] as any)[imp.name] = noop;
+    }
+  }
+
+  const instance = await WebAssembly.instantiate(module, importObject);
 
   // Reactor modules use _initialize() instead of _start()
   wasi.initialize(instance);

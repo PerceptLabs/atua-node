@@ -13,3 +13,6 @@ native/simdutf/
 native/libuv/
 native/openssl/
 native/quickjs/
+
+# Compat test package cache (cloned repos, installed deps)
+tests/compat/.packages/

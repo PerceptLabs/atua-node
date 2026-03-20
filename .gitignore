@@ -1,0 +1,15 @@
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+tmp-test-*/
+files.zip
+
+# Native library clones (managed via submodules, not checked in)
+native/zlib/
+native/llhttp/
+native/ada/
+native/simdutf/
+native/libuv/
+native/openssl/
+native/quickjs/

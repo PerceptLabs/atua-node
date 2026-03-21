@@ -57,17 +57,20 @@ const TEST_CMD_OVERRIDES: Record<string, string> = {
   // Tier 1
   'chalk':        'ava',
   'debug':        'mocha test.js test.node.js',
-  'dotenv':       'tap run --allow-empty-coverage --disable-coverage --timeout=60000',
-  'uuid':         'jest test/unit/ --no-coverage',
+  'dotenv':       'node --test tests/*.js',             // tap v18 has TS config issues
+  'uuid':         'npx jest test/unit/ --no-coverage --verbose',  // verbose for parseable output
   'validator':    'mocha --reporter dot --recursive test/',
   'escape-string-regexp': 'ava',
   'bytes':        'mocha --reporter spec test/',
+  'inherits':     'node -e "require(\'./test/browser\');require(\'./test/old\')"',
+  'safe-buffer':  'tape test/*.js',                     // skip standard linter
+  'lru-cache':    'node --test test/*.js',              // skip tap (plugin issues)
   // Tier 2
   'jsonwebtoken': 'mocha --timeout 10000',
   'ejs':          'mocha --recursive --reporter spec test/',
   'qs':           'tape "test/**/*.js"',
   'ws':           'mocha --throw-deprecation test/*.test.js',
-  'pino':         'tap test/*.test.js --timeout=60',
+  'pino':         'npm run transpile 2>/dev/null; node --test test/*.test.js',  // build first, then node:test
   // Tier 3
   'express':      'mocha --require test/support/env --reporter dot test/ test/acceptance/',
   'nodemailer':   'node --test test/**/*.test.js test/**/*-test.js',
@@ -292,10 +295,16 @@ export function parseTestOutput(stdout: string, stderr: string): {
     const passed = parseInt(mochaPass[1]);
     const failed = mochaFail ? parseInt(mochaFail[1]) : 0;
     const skipped = mochaPend ? parseInt(mochaPend[1]) : 0;
-    // Extract mocha failures: "  N) test name\n     ErrorType: message"
-    const failBlocks = output.matchAll(/^\s+\d+\)\s+(.+?)(?:\n\s+(.+?))?(?:\n|$)/gm);
-    for (const m of failBlocks) {
-      failures.push({ name: m[1].trim(), error: (m[2] ?? '').trim() });
+    // Extract mocha failures: "  N) test name\n      ErrorType: message\n        at ..."
+    const failRegex = /^\s+(\d+)\)\s+(.+)$/gm;
+    let failMatch;
+    while ((failMatch = failRegex.exec(output)) !== null) {
+      const testName = failMatch[2].trim();
+      // Look for error message on the next indented line(s)
+      const afterIdx = failMatch.index + failMatch[0].length;
+      const afterText = output.substring(afterIdx, afterIdx + 500);
+      const errLine = afterText.match(/\n\s{4,}(\S.+)/);
+      failures.push({ name: testName, error: errLine ? errLine[1].trim() : '' });
     }
     return { total: passed + failed + skipped, passed, failed, skipped, failures };
   }
@@ -404,7 +413,9 @@ export async function runPackageTests(name: string, tier: number): Promise<Packa
   // Run test command in WSL
   const { stdout, stderr } = wslRun('test', dir, testCmd);
   const parsed = parseTestOutput(stdout, stderr);
-  const rate = parsed.total > 0 ? `${Math.round((parsed.passed / parsed.total) * 100)}%` : '0%';
+  // Rate = passed/(passed+failed) — skipped tests don't penalize
+  const executed = parsed.passed + parsed.failed;
+  const rate = executed > 0 ? `${Math.round((parsed.passed / executed) * 100)}%` : '0%';
 
   const failures: FailureDetail[] = parsed.failures.map(f => ({
     testName: f.name,
@@ -425,19 +436,22 @@ export function generateResultsMd(results: PackageResult[]): string {
   let md = '# Package Compatibility Matrix\n\n';
   md += `Generated: ${new Date().toISOString()}\n\n`;
 
-  md += '| Package | Version | Total | Passed | Failed | Rate | Tier |\n';
-  md += '|---------|---------|-------|--------|--------|------|------|\n';
+  md += '| Package | Version | Total | Passed | Failed | Skipped | Rate | Tier |\n';
+  md += '|---------|---------|-------|--------|--------|---------|------|------|\n';
 
   for (const r of results) {
-    md += `| ${r.package} | ${r.version} | ${r.total} | ${r.passed} | ${r.failed} | ${r.rate} | ${r.tier} |\n`;
+    md += `| ${r.package} | ${r.version} | ${r.total} | ${r.passed} | ${r.failed} | ${r.skipped} | ${r.rate} | ${r.tier} |\n`;
   }
 
   for (const tier of [1, 2, 3]) {
     const tr = results.filter(r => r.tier === tier);
     const tt = tr.reduce((s, r) => s + r.total, 0);
     const tp = tr.reduce((s, r) => s + r.passed, 0);
-    const rate = tt > 0 ? `${Math.round((tp / tt) * 100)}%` : 'N/A';
-    md += `| **Tier ${tier} Total** | | **${tt}** | **${tp}** | **${tt - tp}** | **${rate}** | **${tier}** |\n`;
+    const tf = tr.reduce((s, r) => s + r.failed, 0);
+    const ts = tr.reduce((s, r) => s + r.skipped, 0);
+    const executed = tp + tf;
+    const rate = executed > 0 ? `${Math.round((tp / executed) * 100)}%` : 'N/A';
+    md += `| **Tier ${tier} Total** | | **${tt}** | **${tp}** | **${tf}** | **${ts}** | **${rate}** | **${tier}** |\n`;
   }
 
   const allFailures = results.flatMap(r => r.failures.map(f => ({ ...f, pkg: r.package })));

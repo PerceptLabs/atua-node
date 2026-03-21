@@ -14,18 +14,29 @@ import { runPackageTests, generateResultsMd, type PackageResult } from './harnes
 // ── Package lists by tier ───────────────────────────────────
 
 const TIER_1 = [
-  'semver', 'dotenv', 'commander', 'chalk', 'ms',
+  // Original 10 (ms replaced with bytes — ms v2.1.3 is a monorepo with no tests)
+  'semver', 'dotenv', 'commander', 'chalk', 'bytes',
   'uuid', 'validator', 'minimatch', 'debug', 'lru-cache',
+  // New 10
+  'minimist', 'camelcase', 'escape-string-regexp', 'balanced-match',
+  'once', 'wrappy', 'inherits', 'isarray', 'safe-buffer', 'depd',
 ];
 
 const TIER_2 = [
+  // Original 10
   'jsonwebtoken', 'ejs', 'pug', 'dotenv-expand', 'cookie',
   'qs', 'on-finished', 'content-type', 'accepts', 'type-is',
+  // New 10
+  'which', 'normalize-path', 'is-number', 'yallist', 'signal-exit',
+  'destroy', 'etag', 'fresh', 'range-parser', 'mime',
 ];
 
 const TIER_3 = [
+  // Original 10
   'express', 'undici', 'pino', 'archiver', 'ws',
   'readable-stream', 'tar', 'formidable', 'nodemailer', 'glob',
+  // New 6
+  'body-parser', 'raw-body', 'serve-static', 'finalhandler', 'send', 'compression',
 ];
 
 // ── CLI argument parsing ────────────────────────────────────

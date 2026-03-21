@@ -19,7 +19,12 @@ case "$ACTION" in
     git clone --depth 1 "https://github.com/$REPO.git" "$DEST" 2>&1
     ;;
   install)
-    cd "$PKG_DIR" && npm install --ignore-scripts 2>&1 || true
+    cd "$PKG_DIR" || exit 1
+    # Remove Windows node_modules if present (platform mismatch with WSL)
+    if [ -d node_modules ] && [ -f node_modules/.package-lock.json ]; then
+      rm -rf node_modules 2>/dev/null || true
+    fi
+    npm install 2>&1 || true
     ;;
   build)
     cd "$PKG_DIR" && npm run build 2>&1 || npm run prepare 2>&1 || true

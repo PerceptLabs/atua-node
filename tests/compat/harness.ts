@@ -54,19 +54,24 @@ function wslRun(action: string, pkgDir: string, ...args: string[]): { stdout: st
 
 /** Override test commands for packages with complex/broken test scripts */
 const TEST_CMD_OVERRIDES: Record<string, string> = {
+  // Tier 1
   'chalk':        'ava',
   'debug':        'mocha test.js test.node.js',
+  'dotenv':       'tap run --allow-empty-coverage --disable-coverage --timeout=60000',
+  'uuid':         'jest test/unit/ --no-coverage',
+  'validator':    'mocha --reporter dot --recursive test/',
+  'escape-string-regexp': 'ava',
+  'bytes':        'mocha --reporter spec test/',
+  // Tier 2
   'jsonwebtoken': 'mocha --timeout 10000',
   'ejs':          'mocha --recursive --reporter spec test/',
   'qs':           'tape "test/**/*.js"',
   'ws':           'mocha --throw-deprecation test/*.test.js',
+  'pino':         'tap test/*.test.js --timeout=60',
+  // Tier 3
   'express':      'mocha --require test/support/env --reporter dot test/ test/acceptance/',
   'nodemailer':   'node --test test/**/*.test.js test/**/*-test.js',
   'undici':       'node --test test/*.js',
-  'dotenv':       'mocha "tests/**/*.js" --recursive --reporter spec --timeout 10000',
-  'validator':    'mocha --reporter dot --recursive test/',
-  'pino':         'tap test/*.test.js --timeout=60',
-  'bytes':        'mocha --reporter spec test/',
 };
 
 /** Git repos + version tags (npm tarballs strip test files) */
@@ -91,7 +96,7 @@ const GIT_REPOS: Record<string, { repo: string; tag: string }> = {
   'wrappy': { repo: 'npm/wrappy', tag: 'v1.0.2' },
   'inherits': { repo: 'isaacs/inherits', tag: 'v2.0.4' },
   'isarray': { repo: 'juliangruber/isarray', tag: 'v2.0.5' },
-  'safe-buffer': { repo: 'nicolo-ribaudo/safe-buffer', tag: 'v5.2.1' },
+  'safe-buffer': { repo: 'feross/safe-buffer', tag: 'v5.2.1' },
   'depd': { repo: 'dougwilson/nodejs-depd', tag: '2.0.0' },
   // ── Tier 2 (original) ──
   'jsonwebtoken': { repo: 'auth0/node-jsonwebtoken', tag: 'v9.0.2' },
@@ -133,6 +138,50 @@ const GIT_REPOS: Record<string, { repo: string; tag: string }> = {
   'finalhandler': { repo: 'pillarjs/finalhandler', tag: '1.3.1' },
   'send': { repo: 'pillarjs/send', tag: 'v0.19.0' },
   'compression': { repo: 'expressjs/compression', tag: 'v1.7.5' },
+  // ── Tier 1 expansion (Step 7) ──
+  'lodash': { repo: 'lodash/lodash', tag: '4.17.21' },
+  'yargs': { repo: 'yargs/yargs', tag: 'v17.7.2' },
+  'p-limit': { repo: 'sindresorhus/p-limit', tag: 'v5.0.0' },
+  'strip-ansi': { repo: 'chalk/strip-ansi', tag: 'v7.1.0' },
+  'string-width': { repo: 'sindresorhus/string-width', tag: 'v7.2.0' },
+  'supports-color': { repo: 'chalk/supports-color', tag: 'v9.4.0' },
+  'has-flag': { repo: 'sindresorhus/has-flag', tag: 'v5.0.1' },
+  'resolve': { repo: 'browserify/resolve', tag: 'v1.22.10' },
+  'path-parse': { repo: 'jbgutierrez/path-parse', tag: 'v1.0.7' },
+  'object-assign': { repo: 'sindresorhus/object-assign', tag: 'v4.1.1' },
+  // ── Tier 2 expansion (Step 7) ──
+  'mkdirp': { repo: 'isaacs/node-mkdirp', tag: 'v3.0.1' },
+  'rimraf': { repo: 'isaacs/rimraf', tag: 'v5.0.10' },
+  'picomatch': { repo: 'micromatch/picomatch', tag: '2.3.1' },
+  'micromatch': { repo: 'micromatch/micromatch', tag: '4.0.8' },
+  'fast-glob': { repo: 'mrmlnc/fast-glob', tag: '3.3.3' },
+  'anymatch': { repo: 'micromatch/anymatch', tag: 'v3.1.3' },
+  'fill-range': { repo: 'jonschlinkert/fill-range', tag: '7.1.1' },
+  'to-regex-range': { repo: 'micromatch/to-regex-range', tag: '5.0.1' },
+  'merge2': { repo: 'teambition/merge2', tag: 'v1.4.1' },
+  'run-parallel': { repo: 'feross/run-parallel', tag: 'v1.2.0' },
+  // ── Tier 3 expansion (Step 7) ──
+  'axios': { repo: 'axios/axios', tag: 'v1.7.9' },
+  'node-fetch': { repo: 'node-fetch/node-fetch', tag: 'v3.3.2' },
+  'form-data': { repo: 'form-data/form-data', tag: 'v4.0.1' },
+  'tough-cookie': { repo: 'salesforce/tough-cookie', tag: 'v5.1.2' },
+  'follow-redirects': { repo: 'follow-redirects/follow-redirects', tag: 'v1.15.9' },
+  'mime-types': { repo: 'jshttp/mime-types', tag: 'v2.1.35' },
+  'mime-db': { repo: 'jshttp/mime-db', tag: 'v1.52.0' },
+  'proxy-addr': { repo: 'jshttp/proxy-addr', tag: 'v2.0.7' },
+  'forwarded': { repo: 'jshttp/forwarded', tag: 'v0.2.0' },
+  'ipaddr.js': { repo: 'whitequark/ipaddr.js', tag: 'v2.2.0' },
+  'statuses': { repo: 'jshttp/statuses', tag: 'v2.0.1' },
+  'toidentifier': { repo: 'component/toidentifier', tag: '1.0.1' },
+  'merge-descriptors': { repo: 'component/merge-descriptors', tag: '2.0.0' },
+  'utils-merge': { repo: 'jaredhanson/utils-merge', tag: 'v1.0.1' },
+  'path-to-regexp': { repo: 'pillarjs/path-to-regexp', tag: 'v6.3.0' },
+  'methods': { repo: 'jshttp/methods', tag: 'v1.1.2' },
+  'vary': { repo: 'jshttp/vary', tag: 'v1.1.2' },
+  'encodeurl': { repo: 'pillarjs/encodeurl', tag: 'v2.0.0' },
+  'escape-html': { repo: 'component/escape-html', tag: 'v1.0.3' },
+  'parseurl': { repo: 'pillarjs/parseurl', tag: 'v1.3.3' },
+  'on-headers': { repo: 'jshttp/on-headers', tag: 'v1.0.2' },
 };
 
 /**

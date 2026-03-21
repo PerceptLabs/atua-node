@@ -14,46 +14,57 @@ import { runPackageTests, generateResultsMd, type PackageResult } from './harnes
 // ── Package lists by tier ───────────────────────────────────
 
 const TIER_1 = [
-  // Original 10 (ms replaced with bytes — ms v2.1.3 is a monorepo with no tests)
+  // Original 10 (ms replaced with bytes)
   'semver', 'dotenv', 'commander', 'chalk', 'bytes',
   'uuid', 'validator', 'minimatch', 'debug', 'lru-cache',
-  // New 10
+  // Batch 2 (10)
   'minimist', 'camelcase', 'escape-string-regexp', 'balanced-match',
   'once', 'wrappy', 'inherits', 'isarray', 'safe-buffer', 'depd',
+  // Batch 3 (10) — Step 7 expansion
+  'lodash', 'yargs', 'p-limit', 'strip-ansi', 'string-width',
+  'supports-color', 'has-flag', 'resolve', 'path-parse', 'object-assign',
 ];
 
 const TIER_2 = [
   // Original 10
   'jsonwebtoken', 'ejs', 'pug', 'dotenv-expand', 'cookie',
   'qs', 'on-finished', 'content-type', 'accepts', 'type-is',
-  // New 10
+  // Batch 2 (10)
   'which', 'normalize-path', 'is-number', 'yallist', 'signal-exit',
   'destroy', 'etag', 'fresh', 'range-parser', 'mime',
+  // Batch 3 (10) — Step 7 expansion
+  'mkdirp', 'rimraf', 'picomatch', 'micromatch', 'fast-glob',
+  'anymatch', 'fill-range', 'to-regex-range', 'merge2', 'run-parallel',
 ];
 
 const TIER_3 = [
   // Original 10
   'express', 'undici', 'pino', 'archiver', 'ws',
   'readable-stream', 'tar', 'formidable', 'nodemailer', 'glob',
-  // New 6
+  // Batch 2 (6)
   'body-parser', 'raw-body', 'serve-static', 'finalhandler', 'send', 'compression',
+  // Batch 3 (24) — Step 7 expansion
+  'axios', 'node-fetch', 'form-data', 'tough-cookie',
+  'follow-redirects', 'mime-types', 'mime-db',
+  'proxy-addr', 'forwarded', 'ipaddr.js', 'statuses',
+  'toidentifier', 'merge-descriptors', 'utils-merge',
+  'path-to-regexp', 'methods', 'vary', 'encodeurl',
+  'escape-html', 'parseurl', 'on-headers',
+  // Skipped: http-proxy-agent, https-proxy-agent, agent-base (shared monorepo with complex setup)
 ];
 
 // ── CLI argument parsing ────────────────────────────────────
 
 const args = process.argv.slice(2);
-let tierFilter: number | null = null;
 let packageFilter: string | null = null;
 
 for (let i = 0; i < args.length; i++) {
-  if (args[i] === '--tier' && args[i + 1]) {
-    tierFilter = parseInt(args[i + 1]);
-    i++;
-  } else if (args[i] === '--package' && args[i + 1]) {
+  if (args[i] === '--package' && args[i + 1]) {
     packageFilter = args[i + 1];
     i++;
   }
 }
+// NOTE: --tier flag removed. RESULTS.md must always run ALL tiers in one invocation.
 
 // ── Main ────────────────────────────────────────────────────
 
@@ -73,15 +84,10 @@ async function main() {
                  TIER_3.includes(packageFilter) ? 3 : 0;
     packages = [{ name: packageFilter, tier }];
   } else {
-    if (!tierFilter || tierFilter === 1) {
-      packages.push(...TIER_1.map(name => ({ name, tier: 1 })));
-    }
-    if (!tierFilter || tierFilter === 2) {
-      packages.push(...TIER_2.map(name => ({ name, tier: 2 })));
-    }
-    if (!tierFilter || tierFilter === 3) {
-      packages.push(...TIER_3.map(name => ({ name, tier: 3 })));
-    }
+    // Always run ALL tiers — RESULTS.md must be complete
+    packages.push(...TIER_1.map(name => ({ name, tier: 1 })));
+    packages.push(...TIER_2.map(name => ({ name, tier: 2 })));
+    packages.push(...TIER_3.map(name => ({ name, tier: 3 })));
   }
 
   console.log(`\nRunning ${packages.length} packages...`);

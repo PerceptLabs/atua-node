@@ -53,6 +53,15 @@ const TIER_3 = [
   // Skipped: http-proxy-agent, https-proxy-agent, agent-base (shared monorepo with complex setup)
 ];
 
+const TIER_4 = [
+  // 99%-only stress packages — cascade-fail if any subsystem is wrong
+  'fastify', 'koa', 'hapi', 'supertest', 'nock', 'got',
+  'mocha-pkg', 'tape-pkg',
+  'jose', 'bcryptjs',
+  'through2', 'pump',
+  'jsdom', 'execa',
+];
+
 // ── CLI argument parsing ────────────────────────────────────
 
 const args = process.argv.slice(2);
@@ -81,13 +90,15 @@ async function main() {
   if (packageFilter) {
     const tier = TIER_1.includes(packageFilter) ? 1 :
                  TIER_2.includes(packageFilter) ? 2 :
-                 TIER_3.includes(packageFilter) ? 3 : 0;
+                 TIER_3.includes(packageFilter) ? 3 :
+                 TIER_4.includes(packageFilter) ? 4 : 0;
     packages = [{ name: packageFilter, tier }];
   } else {
     // Always run ALL tiers — RESULTS.md must be complete
     packages.push(...TIER_1.map(name => ({ name, tier: 1 })));
     packages.push(...TIER_2.map(name => ({ name, tier: 2 })));
     packages.push(...TIER_3.map(name => ({ name, tier: 3 })));
+    packages.push(...TIER_4.map(name => ({ name, tier: 4 })));
   }
 
   console.log(`\nRunning ${packages.length} packages...`);
@@ -122,7 +133,7 @@ async function main() {
   }
 
   // Tier totals
-  for (const tier of [1, 2, 3]) {
+  for (const tier of [1, 2, 3, 4]) {
     const tierResults = results.filter(r => r.tier === tier);
     if (tierResults.length === 0) continue;
     const totalTests = tierResults.reduce((s, r) => s + r.total, 0);

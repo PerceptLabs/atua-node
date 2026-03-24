@@ -4,6 +4,7 @@
  * Buffer extends Uint8Array with encoding support and Node.js API surface.
  * All encodings: utf8, ascii, base64, base64url, hex, binary/latin1, utf16le/ucs2.
  */
+export const __atua = true;
 
 const BASE64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
@@ -223,4 +224,63 @@ export class Buffer extends Uint8Array {
   }
 }
 
-export default { Buffer };
+// ── Static method: copyBytesFrom (Node 19.8+) ──────────────
+Buffer.copyBytesFrom = function copyBytesFrom(
+  view: NodeJS.TypedArray,
+  offset?: number,
+  length?: number,
+): Buffer {
+  const off = offset ?? 0;
+  const len = length ?? (view.length - off);
+  const bytes = new Uint8Array(view.buffer, view.byteOffset + off * (view as any).BYTES_PER_ELEMENT, len * (view as any).BYTES_PER_ELEMENT);
+  const buf = Buffer.alloc(bytes.length);
+  buf.set(bytes);
+  return buf;
+} as any;
+
+// ── isUtf8 (Node 19.4+) ────────────────────────────────────
+export function isUtf8(input: Uint8Array | Buffer): boolean {
+  try {
+    new TextDecoder('utf-8', { fatal: true }).decode(input);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// ── isAscii (Node 19.6+) ───────────────────────────────────
+export function isAscii(input: Uint8Array | Buffer): boolean {
+  for (let i = 0; i < input.length; i++) {
+    if (input[i] >= 128) return false;
+  }
+  return true;
+}
+
+// ── transcode (basic implementation) ────────────────────────
+export function transcode(source: Uint8Array | Buffer, fromEnc: string, toEnc: string): Buffer {
+  const decoded = new TextDecoder(fromEnc).decode(source);
+  if (toEnc.toLowerCase() === 'utf8' || toEnc.toLowerCase() === 'utf-8') {
+    return Buffer.from(new TextEncoder().encode(decoded));
+  }
+  return Buffer.from(decoded, toEnc);
+}
+
+// ── constants (Node 18+) ───────────────────────────────────
+export const constants = {
+  MAX_LENGTH: 2 ** 31 - 1,
+  MAX_STRING_LENGTH: 2 ** 28 - 1,
+};
+
+// ── File class (Node 20+) ──────────────────────────────────
+export class File extends Blob {
+  name: string;
+  lastModified: number;
+
+  constructor(bits: BlobPart[], name: string, options?: FilePropertyBag) {
+    super(bits, options);
+    this.name = name;
+    this.lastModified = options?.lastModified ?? Date.now();
+  }
+}
+
+export default { Buffer, isUtf8, isAscii, transcode, constants, File };

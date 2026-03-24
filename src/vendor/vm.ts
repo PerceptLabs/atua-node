@@ -8,6 +8,7 @@
  * this provides a working implementation using Function()
  * constructor as an interim approach that supports the core API.
  */
+export const __atua = true;
 
 export interface Context {
   [key: string]: unknown;
@@ -123,10 +124,93 @@ export class Script {
 export function compileFunction(
   code: string,
   params?: string[],
-  options?: { filename?: string; parsingContext?: Context }
+  options?: { filename?: string; lineOffset?: number; columnOffset?: number; parsingContext?: Context }
 ): Function {
   const paramList = params ?? [];
   return new Function(...paramList, code);
+}
+
+/**
+ * Abstract base class for ES modules (Node 24 API).
+ */
+export abstract class Module {
+  status: string = 'unlinked';
+  identifier: string;
+  namespace: any = null;
+  error: any = undefined;
+
+  constructor(identifier?: string) {
+    this.identifier = identifier ?? '';
+  }
+}
+
+/**
+ * SourceTextModule — requires V8 module API which is not available in browser.
+ */
+export class SourceTextModule extends Module {
+  private _source: string;
+
+  constructor(source: string, options?: { identifier?: string; context?: Context }) {
+    super(options?.identifier ?? 'SourceTextModule');
+    this._source = source;
+  }
+
+  async link(_linker: (specifier: string, referencingModule: Module) => Promise<Module> | Module): Promise<void> {
+    throw new Error('ERR_NOT_SUPPORTED: SourceTextModule requires V8 module API — use runInNewContext for script execution');
+  }
+
+  async evaluate(): Promise<{ result: any }> {
+    throw new Error('ERR_NOT_SUPPORTED: SourceTextModule requires V8 module API — use runInNewContext for script execution');
+  }
+}
+
+/**
+ * SyntheticModule — requires V8 module API which is not available in browser.
+ */
+export class SyntheticModule extends Module {
+  private _exportNames: string[];
+  private _evaluateCallback: (this: SyntheticModule) => void;
+
+  constructor(
+    exportNames: string[],
+    evaluateCallback: (this: SyntheticModule) => void,
+    options?: { identifier?: string; context?: Context }
+  ) {
+    super(options?.identifier ?? 'SyntheticModule');
+    this._exportNames = exportNames;
+    this._evaluateCallback = evaluateCallback;
+  }
+
+  async link(_linker: (specifier: string, referencingModule: Module) => Promise<Module> | Module): Promise<void> {
+    throw new Error('ERR_NOT_SUPPORTED: SyntheticModule requires V8 module API — use runInNewContext for script execution');
+  }
+
+  async evaluate(): Promise<{ result: any }> {
+    throw new Error('ERR_NOT_SUPPORTED: SyntheticModule requires V8 module API — use runInNewContext for script execution');
+  }
+}
+
+/**
+ * Measure memory usage (Node 24 API).
+ */
+export function measureMemory(_options?: { mode?: string; execution?: string }): Promise<{ total: { jsMemoryEstimate: number; jsMemoryRange: [number, number] } }> {
+  const perf = typeof performance !== 'undefined' ? (performance as any) : undefined;
+  if (perf && perf.memory) {
+    const estimate = perf.memory.usedJSHeapSize ?? 0;
+    const limit = perf.memory.jsHeapSizeLimit ?? 0;
+    return Promise.resolve({
+      total: {
+        jsMemoryEstimate: estimate,
+        jsMemoryRange: [estimate, limit] as [number, number],
+      },
+    });
+  }
+  return Promise.resolve({
+    total: {
+      jsMemoryEstimate: 0,
+      jsMemoryRange: [0, 0] as [number, number],
+    },
+  });
 }
 
 export default {
@@ -137,4 +221,8 @@ export default {
   runInThisContext,
   Script,
   compileFunction,
+  Module,
+  SourceTextModule,
+  SyntheticModule,
+  measureMemory,
 };

@@ -4,6 +4,7 @@
  * Provides the public require('crypto') API by delegating to
  * internalBinding('crypto') which wraps libcrypto.wasm.
  */
+export const __atua = true;
 
 import { internalBinding } from './internal-binding.js';
 
@@ -103,6 +104,60 @@ export const constants = {
   RSA_PKCS1_OAEP_PADDING: 4,
 };
 
+// ── Node 22+ one-shot hash ──────────────────────────────────
+export function hash(algorithm: string, data: string | Uint8Array, outputEncoding?: string): string | Buffer {
+  const h = createHash(algorithm);
+  h.update(data);
+  return h.digest(outputEncoding);
+}
+
+// ── WebCrypto passthroughs ──────────────────────────────────
+export const subtle = globalThis.crypto?.subtle;
+export const webcrypto = globalThis.crypto;
+
+// ── Key generation (not yet implemented) ────────────────────
+export function generateKeyPairSync(_type: string, _options?: any): never {
+  throw new Error('ERR_NOT_SUPPORTED: generateKeyPairSync is not supported in browser WASM environment');
+}
+
+export function generateKeySync(_type: string, _options?: any): never {
+  throw new Error('ERR_NOT_SUPPORTED: generateKeySync is not supported in browser WASM environment');
+}
+
+// ── Sign / Verify (not yet implemented) ─────────────────────
+export function sign(_algorithm: string | null | undefined, _data: Uint8Array, _key: any): never {
+  throw new Error('ERR_NOT_SUPPORTED: sign is not supported in browser WASM environment');
+}
+
+export function verify(_algorithm: string | null | undefined, _data: Uint8Array, _key: any, _signature?: Uint8Array): never {
+  throw new Error('ERR_NOT_SUPPORTED: verify is not supported in browser WASM environment');
+}
+
+// ── Key derivation (not yet implemented) ────────────────────
+export function hkdf(_digest: string, _ikm: any, _salt: any, _info: any, _keylen: number, _callback: Function): never {
+  throw new Error('ERR_NOT_SUPPORTED: hkdf is not supported in browser WASM environment');
+}
+
+export function hkdfSync(_digest: string, _ikm: any, _salt: any, _info: any, _keylen: number): never {
+  throw new Error('ERR_NOT_SUPPORTED: hkdfSync is not supported in browser WASM environment');
+}
+
+export function scrypt(_password: any, _salt: any, _keylen: number, _options: any, _callback?: Function): never {
+  throw new Error('ERR_NOT_SUPPORTED: scrypt is not supported in browser WASM environment');
+}
+
+export function scryptSync(_password: any, _salt: any, _keylen: number, _options?: any): never {
+  throw new Error('ERR_NOT_SUPPORTED: scryptSync is not supported in browser WASM environment');
+}
+
+export function pbkdf2(_password: any, _salt: any, _iterations: number, _keylen: number, _digest: string, _callback: Function): never {
+  throw new Error('ERR_NOT_SUPPORTED: pbkdf2 is not supported in browser WASM environment');
+}
+
+export function pbkdf2Sync(_password: any, _salt: any, _iterations: number, _keylen: number, _digest: string): never {
+  throw new Error('ERR_NOT_SUPPORTED: pbkdf2Sync is not supported in browser WASM environment');
+}
+
 export default {
   createHash,
   createHmac,
@@ -115,4 +170,17 @@ export default {
   getHashes,
   getCiphers,
   constants,
+  hash,
+  subtle,
+  webcrypto,
+  generateKeyPairSync,
+  generateKeySync,
+  sign,
+  verify,
+  hkdf,
+  hkdfSync,
+  scrypt,
+  scryptSync,
+  pbkdf2,
+  pbkdf2Sync,
 };

@@ -3,6 +3,7 @@
  *
  * Wraps browser console with Node.js Console class API.
  */
+export const __atua = true;
 
 export class Console {
   private _stdout: { write: (data: string) => void };

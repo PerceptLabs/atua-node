@@ -3,6 +3,7 @@
  *
  * Maps to Web Workers + SharedArrayBuffer via thread-bridge.
  */
+export const __atua = true;
 
 import { EventEmitter } from 'events';
 

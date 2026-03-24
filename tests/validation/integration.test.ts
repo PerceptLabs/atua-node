@@ -160,7 +160,7 @@ describe('Buffer integration', () => {
 describe('process object integration', () => {
   it('process.platform === "linux"', () => { expect(process.platform).toBe('linux'); });
   it('process.arch === "x64"', () => { expect(process.arch).toBe('x64'); });
-  it('process.versions.node exists', () => { expect(process.versions.node).toBe('22.0.0'); });
+  it('process.versions.node exists', () => { expect(process.versions.node).toBe('24.0.0'); });
   it('process.version starts with v', () => { expect(process.version).toMatch(/^v\d/); });
   it('process.pid is 1', () => { expect(process.pid).toBe(1); });
   it('process.hrtime returns tuple', () => { const [s, ns] = process.hrtime(); expect(s).toBeGreaterThanOrEqual(0); expect(ns).toBeLessThan(1e9); });

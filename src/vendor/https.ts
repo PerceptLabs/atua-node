@@ -3,6 +3,7 @@
  *
  * Same as http but with TLS. Client requests use fetch with https:// URLs.
  */
+export const __atua = true;
 
 import { ClientRequest, IncomingMessage, Agent as HttpAgent, createServer as httpCreateServer } from './http.js';
 import { Server as NetServer } from './net.js';

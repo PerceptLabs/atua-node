@@ -1,9 +1,9 @@
-// TODO(browser): Replace with browser-native implementation
 /**
- * Node.js string_decoder module re-export.
- * Pure JS — works in any environment.
+ * Node.js string_decoder module — browser-compatible via string_decoder npm package.
  */
-import string_decoder from 'string_decoder';
+export const __atua = true;
 
-export const { StringDecoder } = string_decoder;
-export default string_decoder;
+import { StringDecoder } from 'string_decoder';
+
+export { StringDecoder };
+export default { StringDecoder };

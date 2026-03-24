@@ -20,26 +20,32 @@ function makeEntry(
 }
 
 export function populateRegistry(router: ModuleRouter): void {
-  // Unenv modules — pure JS polyfills, always available
-  const unenvModules = ['path', 'util', 'events', 'assert', 'querystring', 'string_decoder', 'punycode'];
+  // Unenv modules — standalone browser-compatible implementations
+  const unenvModules = ['path', 'util', 'events', 'assert', 'querystring', 'string_decoder', 'punycode', 'sys'];
   for (const name of unenvModules) {
     router.register(makeEntry(name, 'unenv', 'unenv', vendorModules.get(name)));
   }
 
   // Vendored JS modules — our TypeScript facades
-  const vendoredJsModules = ['stream', 'timers', 'process', 'console'];
+  const vendoredJsModules = [
+    'stream', 'timers', 'process', 'console',
+    // New modules
+    'tty', 'readline', 'module', 'async_hooks', 'perf_hooks',
+    'diagnostics_channel', 'constants', 'domain', 'v8',
+    'inspector', 'trace_events', 'repl', 'test', 'sea',
+  ];
   for (const name of vendoredJsModules) {
     router.register(makeEntry(name, 'vendored-js', 'atua', vendorModules.get(name)));
   }
 
   // WASIX modules — backed by .wasm when available, fall back to vendored JS
-  const wasixModules = ['crypto', 'fs', 'http', 'https', 'zlib', 'net', 'tls', 'buffer', 'os', 'dns', 'url'];
+  const wasixModules = ['crypto', 'fs', 'http', 'https', 'zlib', 'net', 'tls', 'buffer', 'os', 'dns', 'url', 'wasi'];
   for (const name of wasixModules) {
     router.register(makeEntry(name, 'wasix', 'atua', vendorModules.get(name)));
   }
 
   // WASIX-required modules — fall back to vendor baseImpl when WASIX unavailable
-  const wasixRequiredModules = ['vm', 'child_process', 'worker_threads', 'cluster'];
+  const wasixRequiredModules = ['vm', 'child_process', 'worker_threads', 'cluster', 'http2', 'dgram'];
   for (const name of wasixRequiredModules) {
     router.register(makeEntry(name, 'wasix-required', 'atua', vendorModules.get(name)));
   }

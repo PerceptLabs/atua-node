@@ -41,6 +41,21 @@ These are frozen checkpoints. Never switch to them. Keep working on main.
 - When compilation fails, fix the specific error — don't preemptively stub everything
 - Every function either works correctly or returns a documented error for a documented reason
 
+## Proactive Review
+
+When reading code for any reason, evaluate whether it works
+end-to-end — don't just describe what exists.
+
+- If something is disconnected or wired wrong, say so
+  immediately. Don't wait to be asked.
+- If a test isn't testing atua-node's own code (e.g. running
+  on system Node instead of our vendor modules), flag it
+  before helping with anything else.
+- Always identify the biggest gap between what the code
+  claims to do and what it actually does.
+- Shoshanna is not a programmer. Catching dead code paths,
+  missing wiring, and integration gaps is your job, not hers.
+
 ## Compatibility Engineering
 
 You are building @aspect/atua-node — a WASIX-based Node.js

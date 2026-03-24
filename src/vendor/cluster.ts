@@ -4,6 +4,7 @@
  * Maps cluster.fork() to Workers via proc-bridge.
  * Round-robin distribution via MessageChannel.
  */
+export const __atua = true;
 
 import { EventEmitter } from 'events';
 import { ProcBridge } from '../bridges/proc-bridge.js';

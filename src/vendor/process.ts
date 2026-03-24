@@ -5,6 +5,7 @@
  * process.hrtime, process.nextTick, process.env, process.cwd(),
  * process.stdout/stderr/stdin, and signal handling.
  */
+export const __atua = true;
 
 import { EventLoop } from '../libuv/phase-shim.js';
 
@@ -78,25 +79,25 @@ hrtime.bigint = function hrtimeBigint(): bigint {
 export const process = {
   // Versioning
   versions: {
-    node: '22.0.0',
-    v8: '12.4.254.21',
-    uv: '1.48.0',
+    node: '24.0.0',
+    v8: '13.6.233.8',
+    uv: '1.50.0',
     zlib: '1.3.1',
-    openssl: '3.3.0',
-    modules: '127',
-    napi: '9',
-    llhttp: '9.2.1',
-    ares: '1.28.1',
-    icu: '75.1',
+    openssl: '3.4.0',
+    modules: '131',
+    napi: '10',
+    llhttp: '9.3.0',
+    ares: '1.34.4',
+    icu: '76.1',
   } as Record<string, string>,
-  version: 'v22.0.0',
+  version: 'v24.0.0',
 
   // Platform info — report as Linux x64 for compatibility
   platform: 'linux' as string,
   arch: 'x64' as string,
   release: {
     name: 'node',
-    lts: 'Jod',
+    lts: 'Krypton',
     sourceUrl: '',
     headersUrl: '',
   },
@@ -229,6 +230,45 @@ export const process = {
 
   // EventLoop access (for internal use)
   _eventLoop,
+
+  // Node 24 APIs
+
+  loadEnvFile: (_path?: string) => {
+    throw new Error('ERR_NOT_SUPPORTED: loadEnvFile not available in browser');
+  },
+
+  getBuiltinModule: (_id: string) => {
+    throw new Error('ERR_NOT_SUPPORTED: getBuiltinModule not available — use Module Router');
+  },
+
+  permission: {
+    has(_scope: string, _reference?: string): boolean {
+      return false;
+    },
+  },
+
+  sourceMapsEnabled: false,
+
+  getActiveResourcesInfo: (): string[] => {
+    return [];
+  },
+
+  finalization: (() => {
+    const registry = new FinalizationRegistry<() => void>((release) => {
+      release();
+    });
+    const beforeExitRegistry = new FinalizationRegistry<() => void>((release) => {
+      release();
+    });
+    return {
+      register(ref: object, release: () => void) {
+        registry.register(ref, release);
+      },
+      registerBeforeExit(ref: object, release: () => void) {
+        beforeExitRegistry.register(ref, release);
+      },
+    };
+  })(),
 };
 
 export default process;

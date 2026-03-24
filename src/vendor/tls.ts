@@ -4,6 +4,7 @@
  * Client TLS connections backed by atua-net (which uses rustls).
  * Server TLS requires a host preview adapter.
  */
+export const __atua = true;
 
 import { EventEmitter } from 'events';
 import { Socket } from './net.js';

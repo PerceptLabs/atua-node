@@ -4,6 +4,7 @@
  * Routes filesystem operations through fs-bridge → AtuaFS (OPFS-backed).
  * Provides both callback and sync APIs.
  */
+export const __atua = true;
 
 import { EventEmitter } from 'events';
 import { FsBridge, type FileSystem, type FileStat, type DirEntry, O_RDONLY, O_WRONLY, O_CREAT, O_RDWR, O_APPEND, O_TRUNC } from '../bridges/fs-bridge.js';
@@ -301,7 +302,258 @@ export const promises = {
   access: (path: string, mode?: any) => new Promise<void>((resolve, reject) => {
     access(path, mode, (err: any) => err ? reject(err) : resolve());
   }),
+  rename: (oldPath: string, newPath: string) => new Promise<void>((resolve, reject) => {
+    rename(oldPath, newPath, (err) => err ? reject(err) : resolve());
+  }),
+  chmod: (path: string, _mode: number) => new Promise<void>((resolve) => {
+    // chmod is a no-op in the in-memory filesystem
+    queueMicrotask(() => resolve());
+  }),
+  symlink: (target: string, path: string, _type?: string) => new Promise<void>((resolve) => {
+    // Symlinks stored as the target path in _memFs
+    const p = normalizePath(String(path));
+    _memFs.set(p, _encoder.encode(target));
+    _memDirs.add(dirName(p));
+    resolve();
+  }),
+  readlink: (path: string) => new Promise<string>((resolve, reject) => {
+    const p = normalizePath(String(path));
+    const data = _memFs.get(p);
+    if (!data) {
+      reject(Object.assign(new Error(`ENOENT: no such file or directory, readlink '${p}'`), { code: 'ENOENT' }));
+    } else {
+      resolve(_decoder.decode(data));
+    }
+  }),
 };
+
+// ── Dirent class ────────────────────────────────────────────
+
+export class Dirent {
+  name: string;
+  private _isFile: boolean;
+  private _isDir: boolean;
+  private _isSymlink: boolean;
+
+  constructor(name: string, opts: { isFile: boolean; isDirectory: boolean; isSymlink?: boolean }) {
+    this.name = name;
+    this._isFile = opts.isFile;
+    this._isDir = opts.isDirectory;
+    this._isSymlink = opts.isSymlink ?? false;
+  }
+
+  isFile(): boolean { return this._isFile; }
+  isDirectory(): boolean { return this._isDir; }
+  isSymbolicLink(): boolean { return this._isSymlink; }
+  isBlockDevice(): boolean { return false; }
+  isCharacterDevice(): boolean { return false; }
+  isFIFO(): boolean { return false; }
+  isSocket(): boolean { return false; }
+}
+
+// ── Dir class ───────────────────────────────────────────────
+
+export class Dir {
+  path: string;
+  private _entries: Dirent[];
+  private _index: number;
+  private _closed: boolean;
+
+  constructor(dirPath: string, entries: Dirent[]) {
+    this.path = dirPath;
+    this._entries = entries;
+    this._index = 0;
+    this._closed = false;
+  }
+
+  async close(): Promise<void> {
+    this._closed = true;
+  }
+
+  async read(): Promise<Dirent | null> {
+    if (this._closed || this._index >= this._entries.length) return null;
+    return this._entries[this._index++];
+  }
+
+  [Symbol.asyncIterator](): AsyncIterableIterator<Dirent> {
+    const self = this;
+    return {
+      async next(): Promise<IteratorResult<Dirent>> {
+        const entry = await self.read();
+        if (entry === null) return { done: true, value: undefined as any };
+        return { done: false, value: entry };
+      },
+      [Symbol.asyncIterator]() { return this; },
+    };
+  }
+}
+
+// ── opendir ─────────────────────────────────────────────────
+
+export function opendir(path: string, options?: any, callback?: Function): void {
+  if (typeof options === 'function') { callback = options; options = {}; }
+  const p = normalizePath(String(path));
+
+  queueMicrotask(() => {
+    if (!_memDirs.has(p)) {
+      const err = Object.assign(new Error(`ENOENT: no such file or directory, opendir '${p}'`), { code: 'ENOENT' });
+      if (callback) (callback as Function)(err);
+      return;
+    }
+
+    const prefix = p === '/' ? '/' : p + '/';
+    const nameSet = new Set<string>();
+    const entries: Dirent[] = [];
+
+    for (const key of _memFs.keys()) {
+      if (key.startsWith(prefix)) {
+        const name = key.slice(prefix.length).split('/')[0];
+        if (name && !nameSet.has(name)) {
+          nameSet.add(name);
+          entries.push(new Dirent(name, { isFile: true, isDirectory: false }));
+        }
+      }
+    }
+    for (const dir of _memDirs) {
+      if (dir.startsWith(prefix) && dir !== p) {
+        const name = dir.slice(prefix.length).split('/')[0];
+        if (name && !nameSet.has(name)) {
+          nameSet.add(name);
+          entries.push(new Dirent(name, { isFile: false, isDirectory: true }));
+        }
+      }
+    }
+
+    if (callback) (callback as Function)(null, new Dir(p, entries));
+  });
+}
+
+// ── cp / cpSync ─────────────────────────────────────────────
+
+export function cp(src: string, dest: string, options?: any, callback?: Function): void {
+  if (typeof options === 'function') { callback = options; options = {}; }
+  const srcPath = normalizePath(String(src));
+  const destPath = normalizePath(String(dest));
+
+  queueMicrotask(() => {
+    try {
+      cpSync(srcPath, destPath, options);
+      if (callback) (callback as Function)(null);
+    } catch (err) {
+      if (callback) (callback as Function)(err);
+    }
+  });
+}
+
+export function cpSync(src: string, dest: string, options?: any): void {
+  const srcPath = normalizePath(String(src));
+  const destPath = normalizePath(String(dest));
+  const recursive = options?.recursive ?? false;
+
+  if (_memFs.has(srcPath)) {
+    // Copy a single file
+    _memFs.set(destPath, new Uint8Array(_memFs.get(srcPath)!));
+    _memDirs.add(dirName(destPath));
+    return;
+  }
+
+  if (_memDirs.has(srcPath)) {
+    if (!recursive) {
+      throw Object.assign(
+        new Error(`ERR_FS_EISDIR: Path is a directory. To copy a directory, use the recursive option.`),
+        { code: 'ERR_FS_EISDIR' }
+      );
+    }
+    // Recursively copy directory contents
+    _memDirs.add(destPath);
+    const prefix = srcPath === '/' ? '/' : srcPath + '/';
+    for (const [key, value] of _memFs.entries()) {
+      if (key.startsWith(prefix)) {
+        const relative = key.slice(srcPath.length);
+        const newKey = destPath + relative;
+        _memFs.set(newKey, new Uint8Array(value));
+        _memDirs.add(dirName(newKey));
+      }
+    }
+    for (const dir of _memDirs) {
+      if (dir.startsWith(prefix)) {
+        const relative = dir.slice(srcPath.length);
+        _memDirs.add(destPath + relative);
+      }
+    }
+    return;
+  }
+
+  throw Object.assign(new Error(`ENOENT: no such file or directory, cp '${srcPath}'`), { code: 'ENOENT' });
+}
+
+// ── statfs ──────────────────────────────────────────────────
+
+export function statfs(path: string, options?: any, callback?: Function): void {
+  if (typeof options === 'function') { callback = options; options = {}; }
+  queueMicrotask(() => {
+    // Return reasonable defaults for an in-memory filesystem
+    const result = {
+      type: 0x2fc12fc1, // OPFS magic
+      bsize: 4096,
+      blocks: 262144, // ~1 GB
+      bfree: 131072,
+      bavail: 131072,
+      files: 65536,
+      ffree: 65536,
+    };
+    if (callback) (callback as Function)(null, result);
+  });
+}
+
+// ── chmod (async) ───────────────────────────────────────────
+
+export function chmod(path: string, mode: number, callback: (err: Error | null) => void): void {
+  // No-op in the in-memory filesystem
+  queueMicrotask(() => callback(null));
+}
+
+// ── symlink / readlink (async) ──────────────────────────────
+
+export function symlink(target: string, path: string, typeOrCallback?: string | Function, callback?: Function): void {
+  if (typeof typeOrCallback === 'function') { callback = typeOrCallback; }
+  const p = normalizePath(String(path));
+  _memFs.set(p, _encoder.encode(target));
+  _memDirs.add(dirName(p));
+  if (callback) queueMicrotask(() => (callback as Function)(null));
+}
+
+export function readlink(path: string, options?: any, callback?: Function): void {
+  if (typeof options === 'function') { callback = options; options = {}; }
+  const p = normalizePath(String(path));
+  queueMicrotask(() => {
+    const data = _memFs.get(p);
+    if (!data) {
+      if (callback) (callback as Function)(Object.assign(new Error(`ENOENT: no such file or directory, readlink '${p}'`), { code: 'ENOENT' }));
+    } else {
+      if (callback) (callback as Function)(null, _decoder.decode(data));
+    }
+  });
+}
+
+// ── glob / globSync ─────────────────────────────────────────
+
+export function glob(_pattern: string, _options?: any, callback?: Function): void {
+  if (typeof _options === 'function') { callback = _options; }
+  const err = Object.assign(
+    new Error('fs.glob is not supported in the Atua runtime'),
+    { code: 'ERR_NOT_SUPPORTED' }
+  );
+  if (callback) queueMicrotask(() => (callback as Function)(err));
+  else throw err;
+}
+
+export function globSync(_pattern: string, _options?: any): never {
+  throw Object.assign(
+    new Error('fs.globSync is not supported in the Atua runtime'),
+    { code: 'ERR_NOT_SUPPORTED' }
+  );
+}
 
 // ── Constants ───────────────────────────────────────────────
 
@@ -317,4 +569,6 @@ export default {
   readFile, writeFile, stat, mkdir, readdir, unlink, rename, access,
   readFileSync, writeFileSync, statSync, mkdirSync, readdirSync, unlinkSync, rmSync,
   existsSync, watch, promises, constants, Stats,
+  Dirent, Dir, opendir, cp, cpSync, statfs, chmod, symlink, readlink,
+  glob, globSync,
 };

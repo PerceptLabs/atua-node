@@ -4,6 +4,7 @@
  * Routes DNS resolution through the browser's built-in resolution
  * (via fetch/URL) since WASI has no DNS syscalls.
  */
+export const __atua = true;
 
 export interface LookupAddress {
   address: string;

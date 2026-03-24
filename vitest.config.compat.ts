@@ -2,24 +2,28 @@
  * Vitest config for compat-vendor tests.
  *
  * Aliases Node built-in module names to atua-node vendor implementations.
- * Only aliases the 18 modules with real vendor code — the 8 re-export modules
- * (path, util, events, assert, querystring, string_decoder, punycode, stream)
- * resolve to Node builtins naturally in vitest, avoiding circular aliases.
+ * The 8 npm-package-based modules (path, events, stream, assert, util, querystring,
+ * string_decoder, punycode) are NOT aliased to avoid circular imports — they import
+ * from their npm packages which vitest resolves naturally.
+ * sys is also excluded (re-exports util).
  */
 import { defineConfig } from 'vitest/config';
 import { resolve } from 'path';
 
 const vendorDir = resolve(__dirname, 'src/vendor');
 
-// Modules with real atua-node vendor implementations
-const vendoredModules = [
-  'buffer', 'child_process', 'cluster', 'console', 'crypto',
-  'dns', 'fs', 'http', 'https', 'net', 'os', 'process',
-  'timers', 'tls', 'url', 'vm', 'worker_threads', 'zlib',
+// Modules with original implementations (no circular import risk)
+const aliasedModules = [
+  'async_hooks', 'buffer', 'child_process', 'cluster', 'console',
+  'constants', 'crypto', 'dgram', 'diagnostics_channel', 'dns', 'domain',
+  'fs', 'http', 'http2', 'https', 'inspector', 'module', 'net',
+  'os', 'perf_hooks', 'process', 'readline', 'repl', 'sea',
+  'test', 'timers', 'tls', 'trace_events', 'tty', 'url',
+  'v8', 'vm', 'wasi', 'worker_threads', 'zlib',
 ];
 
 const aliases: Record<string, string> = {};
-for (const name of vendoredModules) {
+for (const name of aliasedModules) {
   aliases[name] = resolve(vendorDir, `${name}.ts`);
   aliases[`node:${name}`] = resolve(vendorDir, `${name}.ts`);
 }

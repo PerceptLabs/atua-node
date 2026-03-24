@@ -4,6 +4,7 @@
  * Provides the public require('zlib') API by delegating to
  * internalBinding('zlib') which wraps zlib.wasm.
  */
+export const __atua = true;
 
 import { internalBinding } from './internal-binding.js';
 
@@ -135,6 +136,57 @@ export const constants = {
   Z_FILTERED, Z_HUFFMAN_ONLY, Z_RLE, Z_FIXED, Z_DEFAULT_STRATEGY,
 };
 
+// ── Brotli (not yet available in zlib.wasm) ─────────────────
+export function brotliCompress(_buffer: Uint8Array, _options: any, _callback?: Function): never {
+  throw new Error('ERR_NOT_SUPPORTED: brotliCompress is not supported — Brotli not available in zlib.wasm');
+}
+
+export function brotliCompressSync(_buffer: Uint8Array, _options?: any): never {
+  throw new Error('ERR_NOT_SUPPORTED: brotliCompressSync is not supported — Brotli not available in zlib.wasm');
+}
+
+export function brotliDecompress(_buffer: Uint8Array, _options: any, _callback?: Function): never {
+  throw new Error('ERR_NOT_SUPPORTED: brotliDecompress is not supported — Brotli not available in zlib.wasm');
+}
+
+export function brotliDecompressSync(_buffer: Uint8Array, _options?: any): never {
+  throw new Error('ERR_NOT_SUPPORTED: brotliDecompressSync is not supported — Brotli not available in zlib.wasm');
+}
+
+export class BrotliCompress {
+  constructor() {
+    throw new Error('ERR_NOT_SUPPORTED: BrotliCompress is not supported — Brotli not available in zlib.wasm');
+  }
+}
+
+export class BrotliDecompress {
+  constructor() {
+    throw new Error('ERR_NOT_SUPPORTED: BrotliDecompress is not supported — Brotli not available in zlib.wasm');
+  }
+}
+
+// ── CRC-32 (pure JS implementation) ────────────────────────
+const _crc32Table = (() => {
+  const table = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) {
+    let c = i;
+    for (let j = 0; j < 8; j++) {
+      c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    }
+    table[i] = c;
+  }
+  return table;
+})();
+
+export function crc32(data: Uint8Array | string, value?: number): number {
+  const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : data;
+  let crc = (value ?? 0) ^ 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) {
+    crc = _crc32Table[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8);
+  }
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+
 export default {
   createGzip, createGunzip, createDeflate, createInflate,
   createDeflateRaw, createInflateRaw,
@@ -143,4 +195,8 @@ export default {
   Z_NO_FLUSH, Z_PARTIAL_FLUSH, Z_SYNC_FLUSH, Z_FULL_FLUSH, Z_FINISH,
   Z_OK, Z_STREAM_END, Z_DEFAULT_COMPRESSION, Z_DEFAULT_STRATEGY,
   Z_BEST_SPEED, Z_BEST_COMPRESSION, Z_NO_COMPRESSION,
+  brotliCompress, brotliCompressSync,
+  brotliDecompress, brotliDecompressSync,
+  BrotliCompress, BrotliDecompress,
+  crc32,
 };

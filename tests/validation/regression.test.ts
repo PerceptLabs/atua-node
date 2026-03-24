@@ -197,8 +197,8 @@ describe('Regression: Epic Brief gap tests', () => {
 
   // ── Gap 9: process.versions.node / process.platform ───────
   it('9. process.versions.node returns valid version', () => {
-    expect(process.versions.node).toBe('22.0.0');
-    expect(process.version).toBe('v22.0.0');
+    expect(process.versions.node).toBe('24.0.0');
+    expect(process.version).toBe('v24.0.0');
   });
 
   it('9. process.platform === "linux" and process.arch === "x64"', () => {

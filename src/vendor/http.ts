@@ -5,6 +5,7 @@
  * Server.listen() requires a host preview adapter.
  * HTTP parsing uses llhttp via binding-http-parser.
  */
+export const __atua = true;
 
 import { EventEmitter } from 'events';
 import { Socket, Server as NetServer } from './net.js';
@@ -242,8 +243,39 @@ export function createServer(_requestListener?: (req: IncomingMessage, res: Serv
   return new NetServer();
 }
 
+// ── Header validation ───────────────────────────────────────
+
+const INVALID_HEADER_NAME_RE = /[^a-zA-Z0-9\-!#$%&'*+.^_`|~]/;
+const INVALID_HEADER_VALUE_RE = /[\x00-\x08\x0a-\x1f\x7f]/;
+
+export function validateHeaderName(name: string): void {
+  if (typeof name !== 'string' || name.length === 0) {
+    throw new TypeError(`Header name must be a valid HTTP token ["${name}"]`);
+  }
+  if (INVALID_HEADER_NAME_RE.test(name)) {
+    throw new TypeError(`Header name must be a valid HTTP token ["${name}"]`);
+  }
+}
+
+export function validateHeaderValue(name: string, value: unknown): void {
+  if (value === undefined) {
+    throw new TypeError(`Invalid value "${value}" for header "${name}"`);
+  }
+  const strValue = String(value);
+  if (INVALID_HEADER_VALUE_RE.test(strValue)) {
+    throw new TypeError(`Invalid character in header content ["${name}"]`);
+  }
+}
+
+// ── setMaxIdleHTTPParsers ───────────────────────────────────
+
+export function setMaxIdleHTTPParsers(_max: number): void {
+  // No-op: browser doesn't pool HTTP parsers
+}
+
 export default {
   METHODS, STATUS_CODES,
   IncomingMessage, ServerResponse, ClientRequest,
   request, get, Agent, globalAgent, createServer,
+  validateHeaderName, validateHeaderValue, setMaxIdleHTTPParsers,
 };

@@ -6,6 +6,7 @@
  * exec() → limited shell emulation
  * spawn() → Worker with stdin/stdout/stderr
  */
+export const __atua = true;
 
 import { EventEmitter } from 'events';
 import { ProcBridge } from '../bridges/proc-bridge.js';

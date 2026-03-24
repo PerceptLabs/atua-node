@@ -12,10 +12,10 @@ describe('process object', () => {
   });
 
   it('should have valid version strings', () => {
-    expect(process.version).toBe('v22.0.0');
-    expect(process.versions.node).toBe('22.0.0');
+    expect(process.version).toBe('v24.0.0');
+    expect(process.versions.node).toBe('24.0.0');
     expect(process.versions.v8).toBeDefined();
-    expect(process.versions.openssl).toBe('3.3.0');
+    expect(process.versions.openssl).toBe('3.4.0');
     expect(process.versions.zlib).toBe('1.3.1');
   });
 

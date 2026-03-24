@@ -4,6 +4,7 @@
  * Reports as Linux x64 for compatibility with Node.js packages.
  * Memory values come from libuv.wasm when available.
  */
+export const __atua = true;
 
 import { internalBinding } from './internal-binding.js';
 
@@ -58,7 +59,7 @@ export function machine() { return 'x86_64'; }
 export const constants = binding.constants;
 
 export const devNull = '/dev/null';
-export const availableParallelism = () => 1;
+export function availableParallelism(): number { return (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) || 1; }
 
 export default {
   EOL, type, platform, arch, release, hostname, homedir, tmpdir,

@@ -1,228 +1,66 @@
 # Package Compatibility Matrix
 
-Generated: 2026-03-23T09:28:03.068Z
+Generated: 2026-03-24T01:52:36.433Z
 
-| Package | Version | Total | Passed | Failed | Skipped | Rate | Tier |
-|---------|---------|-------|--------|--------|---------|------|------|
-| semver | 7.7.1 | 50 | 49 | 1 | 0 | 98% | 1 |
-| dotenv | 16.4.7 | 57 | 57 | 0 | 0 | 100% | 1 |
-| commander | 12.1.0 | 1112 | 1112 | 0 | 0 | 100% | 1 |
-| chalk | 5.4.1 | 32 | 32 | 0 | 0 | 100% | 1 |
-| bytes | 3.1.2 | 30 | 30 | 0 | 0 | 100% | 1 |
-| uuid | 9.0.1 | 0 | 0 | 0 | 0 | 0% | 1 |
-| validator | 13.12.0 | 0 | 0 | 0 | 0 | 0% | 1 |
-| minimatch | 9.0.5 | 21 | 21 | 0 | 0 | 100% | 1 |
-| debug | 4.3.7 | 16 | 16 | 0 | 0 | 100% | 1 |
-| lru-cache | 10.4.3 | 0 | 0 | 0 | 0 | 0% | 1 |
-| minimist | 1.2.8 | 153 | 153 | 0 | 0 | 100% | 1 |
-| camelcase | 8.0.0 | 7 | 7 | 0 | 0 | 100% | 1 |
-| escape-string-regexp | 5.0.0 | 3 | 3 | 0 | 0 | 100% | 1 |
-| balanced-match | 2.0.0 | 19 | 19 | 0 | 0 | 100% | 1 |
-| once | 1.4.0 | 1 | 1 | 0 | 0 | 100% | 1 |
-| wrappy | 1.0.2 | 1 | 1 | 0 | 0 | 100% | 1 |
-| inherits | 2.0.4 | 14 | 13 | 1 | 0 | 93% | 1 |
-| isarray | 2.0.5 | 28 | 28 | 0 | 0 | 100% | 1 |
-| safe-buffer | 5.2.1 | 50 | 50 | 0 | 0 | 100% | 1 |
-| depd | 2.0.0 | 111 | 89 | 0 | 22 | 100% | 1 |
-| lodash | 4.17.21 | 1 | 1 | 0 | 0 | 100% | 1 |
-| yargs | 17.7.2 | 0 | 0 | 0 | 0 | 0% | 1 |
-| p-limit | 5.0.0 | 10 | 10 | 0 | 0 | 100% | 1 |
-| strip-ansi | 7.1.0 | 4 | 4 | 0 | 0 | 100% | 1 |
-| string-width | 7.2.0 | 9 | 9 | 0 | 0 | 100% | 1 |
-| supports-color | 9.4.0 | 1 | 1 | 0 | 0 | 100% | 1 |
-| has-flag | 5.0.1 | 1 | 1 | 0 | 0 | 100% | 1 |
-| resolve | 1.22.10 | 800 | 800 | 0 | 0 | 100% | 1 |
-| path-parse | 1.0.7 | 1 | 1 | 0 | 0 | 100% | 1 |
-| object-assign | 4.1.1 | 1 | 1 | 0 | 0 | 100% | 1 |
-| jsonwebtoken | 9.0.2 | 512 | 511 | 0 | 1 | 100% | 2 |
-| ejs | 3.1.10 | 153 | 152 | 0 | 1 | 100% | 2 |
-| pug | unknown | 83 | 80 | 3 | 0 | 96% | 2 |
-| dotenv-expand | 11.0.7 | 89 | 89 | 0 | 0 | 100% | 2 |
-| cookie | 0.7.2 | 52 | 52 | 0 | 0 | 100% | 2 |
-| qs | 6.13.1 | 743 | 743 | 0 | 0 | 100% | 2 |
-| on-finished | 2.4.1 | 44 | 44 | 0 | 0 | 100% | 2 |
-| content-type | 1.0.5 | 43 | 43 | 0 | 0 | 100% | 2 |
-| accepts | 1.3.8 | 32 | 32 | 0 | 0 | 100% | 2 |
-| type-is | 1.6.18 | 38 | 38 | 0 | 0 | 100% | 2 |
-| which | 4.0.0 | 2 | 0 | 2 | 0 | 0% | 2 |
-| normalize-path | 3.0.0 | 34 | 34 | 0 | 0 | 100% | 2 |
-| is-number | 7.0.0 | 111 | 111 | 0 | 0 | 100% | 2 |
-| yallist | 4.0.0 | 1 | 1 | 0 | 0 | 100% | 2 |
-| signal-exit | 4.1.0 | 8 | 4 | 4 | 0 | 50% | 2 |
-| destroy | 1.2.0 | 27 | 27 | 0 | 0 | 100% | 2 |
-| etag | 1.8.1 | 17 | 17 | 0 | 0 | 100% | 2 |
-| fresh | 2.0.0 | 23 | 23 | 0 | 0 | 100% | 2 |
-| range-parser | 1.2.1 | 34 | 34 | 0 | 0 | 100% | 2 |
-| mime | 4.0.6 | 6 | 6 | 0 | 0 | 100% | 2 |
-| mkdirp | 3.0.1 | 8 | 0 | 8 | 0 | 0% | 2 |
-| rimraf | 5.0.10 | 18 | 6 | 1 | 11 | 86% | 2 |
-| picomatch | 2.3.1 | 1960 | 1960 | 0 | 0 | 100% | 2 |
-| micromatch | 4.0.8 | 1954 | 1954 | 0 | 0 | 100% | 2 |
-| fast-glob | 3.3.3 | 246 | 246 | 0 | 0 | 100% | 2 |
-| anymatch | 3.1.3 | 27 | 27 | 0 | 0 | 100% | 2 |
-| fill-range | 7.1.1 | 67 | 67 | 0 | 0 | 100% | 2 |
-| to-regex-range | 5.0.1 | 36 | 36 | 0 | 0 | 100% | 2 |
-| merge2 | 1.4.1 | 9 | 9 | 0 | 0 | 100% | 2 |
-| run-parallel | 1.2.0 | 39 | 39 | 0 | 0 | 100% | 2 |
-| express | 5.2.1 | 1249 | 1193 | 56 | 0 | 96% | 3 |
-| undici | 6.21.1 | 685 | 685 | 0 | 0 | 100% | 3 |
-| pino | 9.6.0 | 32 | 32 | 0 | 0 | 100% | 3 |
-| archiver | 7.0.1 | 41 | 39 | 2 | 0 | 95% | 3 |
-| ws | 8.18.1 | 428 | 428 | 0 | 0 | 100% | 3 |
-| readable-stream | 4.7.0 | 189 | 189 | 0 | 0 | 100% | 3 |
-| tar | 7.4.3 | 31 | 14 | 2 | 15 | 88% | 3 |
-| formidable | 3.5.2 | 76 | 68 | 5 | 3 | 93% | 3 |
-| nodemailer | 6.9.16 | 26 | 23 | 3 | 0 | 88% | 3 |
-| glob | 10.4.5 | 38 | 34 | 4 | 0 | 89% | 3 |
-| body-parser | 2.2.2 | 269 | 269 | 0 | 0 | 100% | 3 |
-| raw-body | 3.0.2 | 55 | 55 | 0 | 0 | 100% | 3 |
-| serve-static | 1.16.2 | 92 | 92 | 0 | 0 | 100% | 3 |
-| finalhandler | 2.1.1 | 110 | 106 | 0 | 4 | 100% | 3 |
-| send | 1.2.1 | 139 | 137 | 2 | 0 | 99% | 3 |
-| compression | 1.8.1 | 57 | 56 | 0 | 1 | 100% | 3 |
-| axios | 1.7.9 | 195 | 194 | 1 | 0 | 99% | 3 |
-| node-fetch | 3.1.1 | 394 | 388 | 3 | 3 | 99% | 3 |
-| form-data | 4.0.1 | 1 | 1 | 0 | 0 | 100% | 3 |
-| tough-cookie | 5.1.2 | 691 | 691 | 0 | 0 | 100% | 3 |
-| follow-redirects | 1.15.9 | 159 | 159 | 0 | 0 | 100% | 3 |
-| mime-types | 3.0.2 | 47 | 47 | 0 | 0 | 100% | 3 |
-| mime-db | 1.52.0 | 9 | 9 | 0 | 0 | 100% | 3 |
-| proxy-addr | 2.0.7 | 70 | 70 | 0 | 0 | 100% | 3 |
-| forwarded | 0.2.0 | 9 | 9 | 0 | 0 | 100% | 3 |
-| ipaddr.js | 2.2.0 | 1 | 1 | 0 | 0 | 100% | 3 |
-| statuses | 2.0.1 | 23 | 23 | 0 | 0 | 100% | 3 |
-| toidentifier | 1.0.1 | 4 | 4 | 0 | 0 | 100% | 3 |
-| merge-descriptors | 2.0.0 | 7 | 7 | 0 | 0 | 100% | 3 |
-| utils-merge | 1.0.1 | 0 | 0 | 0 | 0 | 0% | 3 |
-| path-to-regexp | 6.3.0 | 0 | 0 | 0 | 0 | 0% | 3 |
-| methods | 1.1.2 | 0 | 0 | 0 | 0 | 0% | 3 |
-| vary | 1.1.2 | 62 | 62 | 0 | 0 | 100% | 3 |
-| encodeurl | 2.0.0 | 17 | 17 | 0 | 0 | 100% | 3 |
-| escape-html | 1.0.3 | 0 | 0 | 0 | 0 | N/A | 3 |
-| parseurl | 1.3.3 | 20 | 20 | 0 | 0 | 100% | 3 |
-| on-headers | 1.0.2 | 18 | 18 | 0 | 0 | 100% | 3 |
-| fastify | 5.2.1 | 0 | 0 | 0 | 0 | 0% | 4 |
-| koa | 2.15.3 | 368 | 364 | 0 | 4 | 100% | 4 |
-| hapi | 21.3.12 | 0 | 0 | 0 | 0 | 0% | 4 |
-| supertest | 7.0.0 | 0 | 0 | 0 | 0 | 0% | 4 |
-| nock | 0.0.0-development | 0 | 0 | 0 | 0 | 0% | 4 |
-| got | 14.4.5 | 0 | 0 | 0 | 0 | 0% | 4 |
-| mocha-pkg | 10.8.2 | 26 | 26 | 0 | 0 | 100% | 4 |
-| tape-pkg | 5.9.0 | 2 | 2 | 0 | 0 | 100% | 4 |
-| jose | 5.9.6 | 282 | 282 | 0 | 0 | 100% | 4 |
-| bcryptjs | 0.0.0 | 0 | 0 | 0 | 0 | 0% | 4 |
-| through2 | 4.0.2 | 18 | 18 | 0 | 0 | 100% | 4 |
-| pump | 3.0.2 | 1 | 1 | 0 | 0 | 100% | 4 |
-| jsdom | 29.0.1 | 574 | 573 | 1 | 0 | 100% | 4 |
-| execa | 9.5.2 | 763 | 763 | 0 | 0 | 100% | 4 |
-| **Tier 1 Total** | | **2533** | **2509** | **2** | **22** | **100%** | **1** |
-| **Tier 2 Total** | | **6416** | **6385** | **18** | **13** | **100%** | **2** |
-| **Tier 3 Total** | | **5244** | **5140** | **78** | **26** | **99%** | **3** |
-| **Tier 4 Total** | | **2034** | **2029** | **1** | **4** | **100%** | **4** |
+## Status Summary
 
-## Failures
+- pass: 5
+- runtime-fail: 4
+- harness-fail: 2
+- no-runtime-test: 0
+- counted tests: 1803/1971 passed, 15 failed, 153 skipped
+
+## Results
+
+| Package | npm | Version | Status | Total | Passed | Failed | Skipped | Rate | Counted | Tier |
+|---------|-----|---------|--------|-------|--------|--------|---------|------|---------|------|
+| semver | semver | 7.7.4 | runtime-fail | 50 | 44 | 6 | - | 88% | yes | 1 |
+| dotenv | dotenv | 17.3.1 | runtime-fail | 9 | - | 9 | - | 0% | yes | 1 |
+| commander | commander | 14.0.3 | pass | 1367 | 1367 | - | - | 100% | yes | 1 |
+| chalk | chalk | 5.6.2 | runtime-fail | 29 | 29 | - | - | 100% | yes | 1 |
+| bytes | bytes | 3.1.2 | pass | 30 | 30 | - | - | 100% | yes | 1 |
+| uuid | uuid | 13.0.0 | pass | 11 | 11 | - | - | 100% | yes | 1 |
+| validator | validator | 13.15.26 | pass | 306 | 306 | - | - | 100% | yes | 1 |
+| minimatch | minimatch | 10.2.4 | harness-fail | - | - | - | - | N/A | no | 1 |
+| debug | debug | 4.4.3 | runtime-fail | 16 | 16 | - | - | 100% | yes | 1 |
+| lru-cache | lru-cache | 11.2.7 | harness-fail | - | - | - | - | N/A | no | 1 |
+| minimist | minimist | 1.2.8 | pass | 153 | - | - | 153 | 100% | yes | 1 |
+
+## Tier Summaries
+
+- Tier 1: 5/11 packages passing, counted tests 1803/1971
+- Tier 2: 0/0 packages passing, counted tests 0/0
+- Tier 3: 0/0 packages passing, counted tests 0/0
+- Tier 4: 0/0 packages passing, counted tests 0/0
+
+## Runtime Failures
+
+- **semver** (7.7.4) via `npm test --ignore-scripts`: semver/internal    |     100 |      100 |     100 |     100 | | constants.js      |     100 |      100 |     100 |     100 | | debug.js          |     100 |      100 |     100 |     100 | | identifiers.js    |     100 |      100 |     100 |     100 | | lrucache.js       |     100 |      100 |     100 |     100 | | parse-options.js  |     100 |      100 |     100 |     100 | | re.js             |     100 |      100 |     100 |     100 | | semver/ranges      |     100 |      100 |     100 |     100 | | gtr.js            |     100 |      100 |     100 |     100 | | intersects.js     |     100 |      100 |     100 |     100 | | ltr.js            |     100 |      100 |     100 |     100 | | max-satisfying.js |     100 |      100 |     100 |     100 | | min-satisfying.js |     100 |      100 |     100 |     100 | | min-version.js    |     100 |      100 |     100 |     100 | | outside.js        |     100 |      100 |     100 |     100 | | simplify.js       |     100 |      100 |     100 |     100 | | subset.js         |     100 |      100 |     100 |     100 | | to-comparators.js |     100 |      100 |     100 |     100 | | valid.js          |     100 |      100 |     100 |     100 | | -
+- **dotenv** (17.3.1) via `npm test`: 1..0 # no tests found | not ok 9 - tests/test-populate.js # time=4197.301ms | --- | stdio: inherit | cwd: /mnt/c/Users/v1sua/atua-node/tests/compat/.packages/dotenv | externalID: tests/test-populate.js | command: /home/shoshi/.nvm/versions/node/v22.22.1/bin/node | args: | - --import=file:///mnt/c/Users/v1sua/atua-node/tests/compat/.packages/dotenv/node_modules/@isaacs/ts-node-temp-fork-for-pr-2009/import.mjs | - --import=file:///mnt/c/Users/v1sua/atua-node/tests/compat/.packages/dotenv/node_modules/@tapjs/mock/dist/esm/import.mjs | - --enable-source-maps | - --import=file:///mnt/c/Users/v1sua/atua-node/tests/compat/.packages/dotenv/node_modules/@tapjs/processinfo/dist/esm/import.mjs | - /mnt/c/Users/v1sua/atua-node/tests/compat/.packages/dotenv/tests/test-populate.js | jobId: 0 | exitCode: 1 | signal: null | ... | # No coverage generated | # { total: 9, pass: 0, fail: 9 } | # time=4418.622ms
+- **chalk** (5.6.2) via `npm test`: ✔ level › enable/disable colors based on overall chalk .level property, not individual instances | ✔ level › propagate enable/disable changes from child colors | ✔ level › disable colors if they are not supported (121ms) | ✖ Timed out while running tests | ─ | 29 tests passed | ----------------------|---------|----------|---------|---------|--------------------- | File                  | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s | ----------------------|---------|----------|---------|---------|--------------------- | All files             |   98.53 |    92.92 |   90.47 |   98.53 | | source               |   97.28 |     91.8 |   89.47 |   97.28 | | index.js            |   96.88 |       90 |   88.23 |   96.88 | 68-70,90-91,176-177 | utilities.js        |     100 |      100 |     100 |     100 | | test                 |     100 |    94.73 |     100 |     100 | | _fixture.js         |     100 |      100 |     100 |     100 | | chalk.js            |     100 |       92 |     100 |     100 | 8-9 | instance.js         |     100 |      100 |     100 |     100 | | level.js            |     100 |      100 |     100 |     100 | | no-color-support.js |     100 |      100 |     
+- **debug** (4.4.3) via `npm test`: [36m23 03 2026 20:38:40.273:DEBUG [framework.browserify]: [39mcreated browserify bundle: /tmp/407b49400601546a0c82dea3526abf56.browserify.js | [36m23 03 2026 20:38:40.317:DEBUG [framework.browserify]: [39madd bundle to config.files at position 0 | [36m23 03 2026 20:38:40.419:DEBUG [web-server]: [39mInstantiating middleware | [36m23 03 2026 20:38:43.941:DEBUG [framework.browserify]: [39mbuilding bundle | [36m23 03 2026 20:38:43.945:DEBUG [framework.browserify]: [39mupdating src/browser.js in bundle | [36m23 03 2026 20:38:43.946:DEBUG [framework.browserify]: [39mupdating src/common.js in bundle | [36m23 03 2026 20:38:43.947:DEBUG [framework.browserify]: [39mupdating test.js in bundle | [36m23 03 2026 20:38:44.649:DEBUG [framework.browserify]: [39mbundling | [32m23 03 2026 20:38:50.135:INFO [framework.browserify]: [39mbundle built | [32m23 03 2026 20:38:50.143:INFO [karma-server]: [39mKarma v3.1.4 server started at http://0.0.0.0:9876/ | [32m23 03 2026 20:38:50.144:INFO [launcher]: [39mLaunching browsers HeadlessChrome with concurrency 1 | [32m23 03 2026 20:38:50.342:INFO [launcher]: [39mStarting browser ChromeHeadless | [36m23 03 2026 20:38:50.342:DEBUG [temp
+
+## Harness Failures
+
+- **minimatch** (10.2.4) via `n/a`: error: The following untracked working tree files would be overwritten by checkout: | .tshy/build.json | .tshy/commonjs.json | .tshy/esm.json | Please move or remove them before you switch branches. | Aborting
+- **lru-cache** (11.2.7) via `n/a`: error: Your local changes to the following files would be overwritten by checkout: | package-lock.json | package.json | Please commit your changes or stash them before you switch branches. | Aborting
+
+## Failure Details
 
 | Package | Test | Error | Node API | Category |
 |---------|------|-------|----------|----------|
-| semver | test/bin/semver.js # time=30049.545ms | no plan | unknown | compat-bug |
-| inherits | Object.create is not a function | Object.create is not a function | unknown | compat-bug |
-| which | test/bin.js # time=30019.453ms | no plan | unknown | compat-bug |
-| which | test/index.js # time=901.664ms | - | unknown | compat-bug |
-| signal-exit | test/fallback.ts # time=2024.918ms | - | unknown | compat-bug |
-| signal-exit | test/all-integration-test.ts # time=1014.191ms | - | unknown | compat-bug |
-| signal-exit | test/signal-capture.ts # time=959.56ms | - | crypto | compat-bug |
-| signal-exit | test/signal-exit-test.ts # time=945.308ms | - | crypto | browser-ceiling |
-| mkdirp | test/find-made.ts # time=1215.84ms | - | unknown | compat-bug |
-| mkdirp | test/index.ts # time=1226.841ms | - | unknown | compat-bug |
-| mkdirp | test/cmd.ts # time=1225.286ms | - | unknown | compat-bug |
-| mkdirp | test/mkdirp-manual.ts # time=1259.969ms | - | fs | compat-bug |
-| mkdirp | test/opts-arg.ts # time=1222.297ms | - | unknown | compat-bug |
-| mkdirp | test/path-arg.ts # time=1302.075ms | - | path | compat-bug |
-| mkdirp | test/mkdirp-native.ts # time=1219.893ms | - | fs | compat-bug |
-| mkdirp | test/use-native.ts # time=1391.047ms | - | unknown | compat-bug |
-| rimraf | test/delete-many-files.ts # time=49446.181ms | - | unknown | compat-bug |
-| express | res | .download(path) | path | compat-bug |
-| express | res | .download(path) | path | compat-bug |
-| express | res | .download(path) | path | compat-bug |
-| express | res | .download(path, filename) | path | compat-bug |
-| express | res | .download(path, fn) | path | compat-bug |
-| express | res | .download(path, fn) | path | compat-bug |
-| express | res | .download(path, options) | path | compat-bug |
-| express | res | .download(path, options) | path | compat-bug |
-| express | res | .download(path, options) | path | compat-bug |
-| express | res | .download(path, options) | path | compat-bug |
-| express | res | .download(path, options) | path | compat-bug |
-| express | res | .download(path, filename, fn) | path | compat-bug |
-| express | res | .download(path, filename, options, fn) | path | compat-bug |
-| express | res | .download(path, filename, options, fn) | path | compat-bug |
-| express | res | .download(path, filename, options, fn) | path | compat-bug |
-| express | res | on failure | unknown | compat-bug |
-| express | res | .sendFile(path) | path | compat-bug |
-| express | res | .sendFile(path) | path | compat-bug |
-| express | res | .sendFile(path) | path | compat-bug |
-| express | res | .sendFile(path) | path | compat-bug |
-| express | res | .sendFile(path) | path | compat-bug |
-| express | res | .sendFile(path) | path | compat-bug |
-| express | res | .sendFile(path) | path | compat-bug |
-| express | res | .sendFile(path) | path | compat-bug |
-| express | res | .sendFile(path, fn) | path | compat-bug |
-| express | res | .sendFile(path, fn) | path | compat-bug |
-| express | res | .sendFile(path, fn) | path | compat-bug |
-| express | res | .sendFile(path, fn) | path | compat-bug |
-| express | res | .sendFile(path, fn) | path | compat-bug |
-| express | res | .sendFile(path, fn) | path | compat-bug |
-| express | res | .sendFile(path, options) | path | compat-bug |
-| express | res | .sendFile(path, options) | path | compat-bug |
-| express | res | .sendFile(path, options) | path | compat-bug |
-| express | res | .sendFile(path, options) | path | compat-bug |
-| express | res | .sendFile(path, options) | path | compat-bug |
-| express | res | .sendFile(path, options) | path | compat-bug |
-| express | res | .sendFile(path, options) | path | compat-bug |
-| express | res | .sendFile(path, options) | path | compat-bug |
-| express | res | .sendFile(path, options) | path | compat-bug |
-| express | res | .sendFile(path, options) | path | compat-bug |
-| express | res | .sendFile(path, options) | path | compat-bug |
-| express | res | .sendFile(path, options) | path | compat-bug |
-| express | res | .sendFile(path, options) | path | compat-bug |
-| express | res | .sendFile(path, options) | path | compat-bug |
-| express | res | .sendFile(path, options) | path | compat-bug |
-| express | res | .sendFile(path, options) | path | compat-bug |
-| express | res | .sendFile(path, options) | path | compat-bug |
-| express | res | .sendFile(path, options) | path | compat-bug |
-| express | res | .sendFile(path, options) | path | compat-bug |
-| express | res | .sendFile(path, options) | path | compat-bug |
-| express | res | .sendFile(path, options) | path | compat-bug |
-| express | res | .sendFile(path, options) | path | compat-bug |
-| express | res | .sendFile(path, options) | path | compat-bug |
-| express | res | .sendFile(path, options) | path | compat-bug |
-| express | res | .sendFile(path, options) | path | compat-bug |
-| express | mvc | GET /users | unknown | compat-bug |
-| archiver | archiver | api | unknown | compat-bug |
-| archiver | plugins | zip | unknown | compat-bug |
-| tar | test/create.ts # time=79780.627ms | - | unknown | compat-bug |
-| tar | test/pack.js # time=31716.746ms | - | unknown | compat-bug |
-| nodemailer | MimeNode Tests | Test hook "beforeEach" at test/mime-node/mime-node-test.js:1302:9 generated asynchronous activity af | unknown | compat-bug |
-| nodemailer | SMTP-Connection Tests | Test hook "before" at test/smtp-connection/smtp-connection-test.js:32:9 generated asynchronous activ | net | compat-bug |
-| nodemailer | SMTP Pool Tests | Test hook "beforeEach" at test/smtp-pool/smtp-pool-test.js:42:5 generated asynchronous activity afte | unknown | compat-bug |
-| glob | test/bin.ts # time=46872.283ms | - | unknown | compat-bug |
-| glob | test/realpath.ts # time=51641.79ms | - | path | compat-bug |
-| glob | timeout! | - | timers | compat-bug |
-| glob | timeout! | - | timers | compat-bug |
-| send | should work without root | ✔ should 404 if file path contains trailing slash (windows) | path | compat-bug |
-| send | should still serve files with dots in name | 137 passing (617ms) | unknown | compat-bug |
-| send | send(file, options) | index | unknown | compat-bug |
-| send | send(file, options) | root | unknown | compat-bug |
-| axios | should support sockets | ✔ should support buffers | net | compat-bug |
-| axios | supports http with nodejs | should support sockets: | net | compat-bug |
-| node-fetch | should handle chunked response with final chunk and EOM in s | ✔ should handle DNS-error response | http | compat-bug |
-| node-fetch | supports supplying a famliy option to the agent | ✔ should allow a function supplying the agent | unknown | compat-bug |
-| node-fetch | should handle chunked response with final chunk and EOM in s | ✔ should resolve into response | http | compat-bug |
-| node-fetch | node-fetch | should handle chunked response with final chunk and EOM in separate packets: | http | compat-bug |
-| node-fetch | node-fetch | supports supplying a famliy option to the agent: | unknown | compat-bug |
-| node-fetch | node-fetch | should handle chunked response with final chunk and EOM in separate packets: | http | compat-bug |
-| jsdom | frees up callback handles passed to setTimeout | ✔ window.close() should work from within a load event listener | net | preview-adapter |
-| jsdom | Test cases only possible to test from the outside | frees up callback handles passed to setTimeout: | timers | compat-bug |
-
-## Errors
-
-- **escape-html**: No test command
+| semver | test/bin/semver.js # time=30098.795ms | no plan | unknown | compat-bug |
+| semver | test/functions/gt.js # time=31010.164ms | - | unknown | compat-bug |
+| semver | test/functions/gte.js # time=31006.061ms | - | unknown | compat-bug |
+| semver | test/functions/lte.js # time=31006.585ms | - | unknown | compat-bug |
+| semver | test/functions/neq.js # time=31004.44ms | - | unknown | compat-bug |
+| semver | test/internal/debug.js # time=30023.055ms | incorrect number of tests | unknown | compat-bug |
+| dotenv | tests/test-cli-options.js # time=4053.834ms | - | unknown | compat-bug |
+| dotenv | tests/test-config.js # time=4063.77ms | - | unknown | compat-bug |
+| dotenv | tests/test-config-vault.js # time=4027.889ms | - | unknown | compat-bug |
+| dotenv | tests/test-config-cli.js # time=4175.143ms | - | unknown | compat-bug |
+| dotenv | tests/test-decrypt.js # time=4172.104ms | - | unknown | compat-bug |
+| dotenv | tests/test-parse-multiline.js # time=4284.56ms | - | url | compat-bug |
+| dotenv | tests/test-parse.js # time=4146.391ms | - | url | compat-bug |
+| dotenv | tests/test-env-options.js # time=4034.899ms | - | process | compat-bug |
+| dotenv | tests/test-populate.js # time=4197.301ms | - | unknown | compat-bug |

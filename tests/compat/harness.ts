@@ -1,27 +1,16 @@
-/**
- * Package Compatibility Test Harness.
- *
- * Installs real npm packages (via git clone to get test files),
- * runs their actual test suites in WSL (Linux semantics — symlinks work),
- * captures pass/fail counts with actual error messages,
- * and produces a compatibility matrix.
- */
 import { execSync, spawnSync } from 'child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'fs';
 import { join, resolve } from 'path';
+import { fileURLToPath } from 'url';
 
-export interface PackageResult {
-  package: string;
-  version: string;
-  tier: number;
-  total: number;
-  passed: number;
-  failed: number;
-  skipped: number;
-  rate: string;
-  failures: FailureDetail[];
-  error?: string;
-}
+export type PackageStatus = 'pass' | 'runtime-fail' | 'harness-fail' | 'no-runtime-test';
+export type InstallMode =
+  | 'npm-ci'
+  | 'npm-install'
+  | 'npm-ci-legacy'
+  | 'npm-install-legacy'
+  | 'yarn-install'
+  | 'pnpm-install';
 
 export interface FailureDetail {
   testName: string;
@@ -30,20 +19,87 @@ export interface FailureDetail {
   category: 'compat-bug' | 'browser-ceiling' | 'preview-adapter' | 'env-dependent';
 }
 
-const PACKAGES_DIR = resolve(import.meta.dirname, '.packages');
-/** Convert Windows path to WSL path */
+export interface PackageResult {
+  package: string;
+  npmName: string;
+  version: string;
+  tier: number;
+  status: PackageStatus;
+  total: number;
+  passed: number;
+  failed: number;
+  skipped: number;
+  rate: string;
+  countAvailable: boolean;
+  failures: FailureDetail[];
+  command?: string;
+  exitCode?: number;
+  installMode?: InstallMode;
+  source?: string;
+  sourceRef?: string;
+  resolvedAt?: string;
+  error?: string;
+}
+
+type ResolvedPackage = {
+  alias: string;
+  npmName: string;
+  version: string;
+  repoUrl: string;
+  source: string;
+  sourceRef: string;
+  resolvedAt: string;
+};
+
+type WorkflowHints = {
+  testCommands: string[];
+  installCommands: string[];
+};
+
+type ParseResult = {
+  total: number;
+  passed: number;
+  failed: number;
+  skipped: number;
+  countAvailable: boolean;
+  failures: Array<{ name: string; error: string }>;
+};
+
+const COMPAT_DIR = resolve(fileURLToPath(new URL('.', import.meta.url)));
+const PACKAGES_DIR = resolve(COMPAT_DIR, '.packages');
+const SOURCE_META_FILE = '.atua-source.json';
+const INSTALL_META_FILE = '.atua-install.json';
+const RESOLUTION_CACHE = new Map<string, ResolvedPackage>();
+
+const NPM_NAME_OVERRIDES: Record<string, string> = {
+  hapi: '@hapi/hapi',
+  'mocha-pkg': 'mocha',
+  'tape-pkg': 'tape',
+};
+
+const REPO_URL_OVERRIDES: Record<string, string> = {
+  hapi: 'https://github.com/hapijs/hapi.git',
+};
+
+const COMMAND_OVERRIDES: Record<string, string> = {
+  'mocha-pkg': 'npm run test-node',
+  'lru-cache': 'test -d ./node_modules/@tapjs/clock || npm install --no-save --legacy-peer-deps @tapjs/clock@3.0.3; npm test',
+};
+
 function toWslPath(winPath: string): string {
   return winPath.replace(/\\/g, '/').replace(/^([A-Za-z]):/, (_, d) => `/mnt/${d.toLowerCase()}`);
 }
 
-const WSL_SCRIPT = toWslPath(resolve(import.meta.dirname, 'wsl-run.sh'));
+const WSL_SCRIPT = toWslPath(resolve(COMPAT_DIR, 'wsl-run.sh'));
 
-/** Run the wsl-run.sh helper script with given action */
-function wslRun(action: string, pkgDir: string, ...args: string[]): { stdout: string; stderr: string; status: number } {
-  const wslDir = toWslPath(pkgDir);
-  const result = spawnSync('wsl', ['bash', WSL_SCRIPT, action, wslDir, ...args], {
+function wslRun(
+  action: string,
+  pkgDir: string,
+  ...args: string[]
+): { stdout: string; stderr: string; status: number } {
+  const result = spawnSync('wsl', ['bash', WSL_SCRIPT, action, toWslPath(pkgDir), ...args], {
     stdio: 'pipe',
-    timeout: 300000,
+    timeout: 30 * 60 * 1000,
   });
   return {
     stdout: result.stdout?.toString('utf8') ?? '',
@@ -52,234 +108,336 @@ function wslRun(action: string, pkgDir: string, ...args: string[]): { stdout: st
   };
 }
 
-/** Override test commands for packages with complex/broken test scripts */
-const TEST_CMD_OVERRIDES: Record<string, string> = {
-  // ── Tier 1 ──
-  'chalk':        'ava',
-  'debug':        'mocha test.js test.node.js',
-  'dotenv':       'node --test tests/*.js',
-  'uuid':         'npm run build 2>/dev/null; npx jest test/unit/ --no-coverage --verbose',
-  'validator':    'mocha --reporter dot --recursive test/',
-  'escape-string-regexp': 'ava',
-  'bytes':        'mocha --reporter spec test/',
-  'inherits':     'node -e "require(\'./test/browser\');require(\'./test/old\')"',
-  'safe-buffer':  'tape test/*.js',
-  'lru-cache':    'npm run prepare 2>/dev/null; npx tap --no-coverage',
-  'lodash':       'npm run build:main 2>/dev/null; node test/test',
-  'yargs':        'npm run compile 2>/dev/null; npm run build:cjs 2>/dev/null; mocha ./test/*.cjs --require ./test/before.cjs --timeout=12000',
-  'strip-ansi':   'ava',
-  'has-flag':     'ava',
-  'object-assign': 'ava',
-  'supports-color': 'node -e "import(\'./index.js\').then(m => { console.log(\'ok 1 - loads\'); console.log(\'1..1\') })"',
-  'path-parse':   'node -e "require(\'./test.js\'); console.log(\'ok 1 - all assertions passed\'); console.log(\'1..1\')"',
-  // ── Tier 2 ──
-  'jsonwebtoken': 'mocha --timeout 10000',
-  'ejs':          'npx jake test',
-  'qs':           'tape "test/**/*.js"',
-  'ws':           'mocha --throw-deprecation test/*.test.js',
-  'pino':         'npm run transpile 2>/dev/null; node --test test/*.test.js',
-  'mkdirp':       'npm run prepare 2>/dev/null; npx tap --no-coverage',
-  // ── Tier 3 ──
-  'express':      'mocha --require test/support/env --reporter dot test/ test/acceptance/',
-  'nodemailer':   'node --test test/**/*.test.js test/**/*-test.js',
-  'undici':       'node --test test/*.js',
-  'form-data':    'node test/run.js',
-  'utils-merge':  'mocha --reporter spec --require test/bootstrap/node test/*.test.js',
-  'path-to-regexp': 'npm run build 2>/dev/null; npx vitest run --reporter=verbose',
-  'methods':      'mocha --reporter spec --bail --check-leaks test/',
-};
+function safeJsonParse<T>(text: string): T | null {
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return null;
+  }
+}
 
-/** Git repos + version tags (npm tarballs strip test files) */
-const GIT_REPOS: Record<string, { repo: string; tag: string }> = {
-  // ── Tier 1 (original) ──
-  'semver': { repo: 'npm/node-semver', tag: 'v7.7.1' },
-  'dotenv': { repo: 'motdotla/dotenv', tag: 'v16.4.7' },
-  'commander': { repo: 'tj/commander.js', tag: 'v12.1.0' },
-  'chalk': { repo: 'chalk/chalk', tag: 'v5.4.1' },
-  'bytes': { repo: 'visionmedia/bytes.js', tag: '3.1.2' },
-  'uuid': { repo: 'uuidjs/uuid', tag: 'v9.0.1' },
-  'validator': { repo: 'validatorjs/validator.js', tag: '13.12.0' },
-  'minimatch': { repo: 'isaacs/minimatch', tag: 'v9.0.5' },
-  'debug': { repo: 'debug-js/debug', tag: '4.3.7' },
-  'lru-cache': { repo: 'isaacs/node-lru-cache', tag: 'v10.4.3' },
-  // ── Tier 1 (new) ──
-  'minimist': { repo: 'minimistjs/minimist', tag: 'v1.2.8' },
-  'camelcase': { repo: 'sindresorhus/camelcase', tag: 'v8.0.0' },
-  'escape-string-regexp': { repo: 'sindresorhus/escape-string-regexp', tag: 'v5.0.0' },
-  'balanced-match': { repo: 'juliangruber/balanced-match', tag: 'v2.0.0' },
-  'once': { repo: 'isaacs/once', tag: 'v1.4.0' },
-  'wrappy': { repo: 'npm/wrappy', tag: 'v1.0.2' },
-  'inherits': { repo: 'isaacs/inherits', tag: 'v2.0.4' },
-  'isarray': { repo: 'juliangruber/isarray', tag: 'v2.0.5' },
-  'safe-buffer': { repo: 'feross/safe-buffer', tag: 'v5.2.1' },
-  'depd': { repo: 'dougwilson/nodejs-depd', tag: '2.0.0' },
-  // ── Tier 2 (original) ──
-  'jsonwebtoken': { repo: 'auth0/node-jsonwebtoken', tag: 'v9.0.2' },
-  'ejs': { repo: 'mde/ejs', tag: 'v3.1.10' },
-  'pug': { repo: 'pugjs/pug', tag: 'pug@3.0.3' },
-  'dotenv-expand': { repo: 'motdotla/dotenv-expand', tag: 'v11.0.7' },
-  'cookie': { repo: 'jshttp/cookie', tag: 'v0.7.2' },
-  'qs': { repo: 'ljharb/qs', tag: 'v6.13.1' },
-  'on-finished': { repo: 'jshttp/on-finished', tag: 'v2.4.1' },
-  'content-type': { repo: 'jshttp/content-type', tag: 'v1.0.5' },
-  'accepts': { repo: 'jshttp/accepts', tag: '1.3.8' },
-  'type-is': { repo: 'jshttp/type-is', tag: '1.6.18' },
-  // ── Tier 2 (new) ──
-  'which': { repo: 'npm/node-which', tag: 'v4.0.0' },
-  'normalize-path': { repo: 'jonschlinkert/normalize-path', tag: '3.0.0' },
-  'is-number': { repo: 'jonschlinkert/is-number', tag: '7.0.0' },
-  'yallist': { repo: 'isaacs/yallist', tag: 'v4.0.0' },
-  'signal-exit': { repo: 'tapjs/signal-exit', tag: 'v4.1.0' },
-  'destroy': { repo: 'stream-utils/destroy', tag: 'v1.2.0' },
-  'etag': { repo: 'jshttp/etag', tag: '1.8.1' },
-  'fresh': { repo: 'jshttp/fresh', tag: '0.5.2' },
-  'range-parser': { repo: 'jshttp/range-parser', tag: '1.2.1' },
-  'mime': { repo: 'broofa/mime', tag: 'v4.0.6' },
-  // ── Tier 3 (original) ──
-  'express': { repo: 'expressjs/express', tag: 'v4.21.2' },
-  'undici': { repo: 'nodejs/undici', tag: 'v6.21.1' },
-  'pino': { repo: 'pinojs/pino', tag: 'v9.6.0' },
-  'archiver': { repo: 'archiverjs/node-archiver', tag: '7.0.1' },
-  'ws': { repo: 'websockets/ws', tag: '8.18.1' },
-  'readable-stream': { repo: 'nodejs/readable-stream', tag: 'v4.7.0' },
-  'tar': { repo: 'isaacs/node-tar', tag: 'v7.4.3' },
-  'formidable': { repo: 'node-formidable/formidable', tag: 'v3.5.2' },
-  'nodemailer': { repo: 'nodemailer/nodemailer', tag: 'v6.9.16' },
-  'glob': { repo: 'isaacs/node-glob', tag: 'v10.4.5' },
-  // ── Tier 3 (new) ──
-  'body-parser': { repo: 'expressjs/body-parser', tag: 'v1.20.3' },
-  'raw-body': { repo: 'stream-utils/raw-body', tag: 'v2.5.2' },
-  'serve-static': { repo: 'expressjs/serve-static', tag: 'v1.16.2' },
-  'finalhandler': { repo: 'pillarjs/finalhandler', tag: '1.3.1' },
-  'send': { repo: 'pillarjs/send', tag: 'v0.19.0' },
-  'compression': { repo: 'expressjs/compression', tag: 'v1.7.5' },
-  // ── Tier 1 expansion (Step 7) ──
-  'lodash': { repo: 'lodash/lodash', tag: '4.17.21' },
-  'yargs': { repo: 'yargs/yargs', tag: 'v17.7.2' },
-  'p-limit': { repo: 'sindresorhus/p-limit', tag: 'v5.0.0' },
-  'strip-ansi': { repo: 'chalk/strip-ansi', tag: 'v7.1.0' },
-  'string-width': { repo: 'sindresorhus/string-width', tag: 'v7.2.0' },
-  'supports-color': { repo: 'chalk/supports-color', tag: 'v9.4.0' },
-  'has-flag': { repo: 'sindresorhus/has-flag', tag: 'v5.0.1' },
-  'resolve': { repo: 'browserify/resolve', tag: 'v1.22.10' },
-  'path-parse': { repo: 'jbgutierrez/path-parse', tag: 'v1.0.7' },
-  'object-assign': { repo: 'sindresorhus/object-assign', tag: 'v4.1.1' },
-  // ── Tier 2 expansion (Step 7) ──
-  'mkdirp': { repo: 'isaacs/node-mkdirp', tag: 'v3.0.1' },
-  'rimraf': { repo: 'isaacs/rimraf', tag: 'v5.0.10' },
-  'picomatch': { repo: 'micromatch/picomatch', tag: '2.3.1' },
-  'micromatch': { repo: 'micromatch/micromatch', tag: '4.0.8' },
-  'fast-glob': { repo: 'mrmlnc/fast-glob', tag: '3.3.3' },
-  'anymatch': { repo: 'micromatch/anymatch', tag: 'v3.1.3' },
-  'fill-range': { repo: 'jonschlinkert/fill-range', tag: '7.1.1' },
-  'to-regex-range': { repo: 'micromatch/to-regex-range', tag: '5.0.1' },
-  'merge2': { repo: 'teambition/merge2', tag: 'v1.4.1' },
-  'run-parallel': { repo: 'feross/run-parallel', tag: 'v1.2.0' },
-  // ── Tier 3 expansion (Step 7) ──
-  'axios': { repo: 'axios/axios', tag: 'v1.7.9' },
-  'node-fetch': { repo: 'node-fetch/node-fetch', tag: 'v3.3.2' },
-  'form-data': { repo: 'form-data/form-data', tag: 'v4.0.1' },
-  'tough-cookie': { repo: 'salesforce/tough-cookie', tag: 'v5.1.2' },
-  'follow-redirects': { repo: 'follow-redirects/follow-redirects', tag: 'v1.15.9' },
-  'mime-types': { repo: 'jshttp/mime-types', tag: 'v2.1.35' },
-  'mime-db': { repo: 'jshttp/mime-db', tag: 'v1.52.0' },
-  'proxy-addr': { repo: 'jshttp/proxy-addr', tag: 'v2.0.7' },
-  'forwarded': { repo: 'jshttp/forwarded', tag: 'v0.2.0' },
-  'ipaddr.js': { repo: 'whitequark/ipaddr.js', tag: 'v2.2.0' },
-  'statuses': { repo: 'jshttp/statuses', tag: 'v2.0.1' },
-  'toidentifier': { repo: 'component/toidentifier', tag: '1.0.1' },
-  'merge-descriptors': { repo: 'component/merge-descriptors', tag: '2.0.0' },
-  'utils-merge': { repo: 'jaredhanson/utils-merge', tag: 'v1.0.1' },
-  'path-to-regexp': { repo: 'pillarjs/path-to-regexp', tag: 'v6.3.0' },
-  'methods': { repo: 'jshttp/methods', tag: 'v1.1.2' },
-  'vary': { repo: 'jshttp/vary', tag: 'v1.1.2' },
-  'encodeurl': { repo: 'pillarjs/encodeurl', tag: 'v2.0.0' },
-  'escape-html': { repo: 'component/escape-html', tag: 'v1.0.3' },
-  'parseurl': { repo: 'pillarjs/parseurl', tag: 'v1.3.3' },
-  'on-headers': { repo: 'jshttp/on-headers', tag: 'v1.0.2' },
-  // ── Tier 4 — 99%-only stress packages ──
-  'fastify': { repo: 'fastify/fastify', tag: 'v5.2.1' },
-  'koa': { repo: 'koajs/koa', tag: '2.15.3' },
-  'hapi': { repo: 'hapijs/hapi', tag: 'v21.3.12' },
-  'supertest': { repo: 'ladjs/supertest', tag: 'v7.0.0' },
-  'nock': { repo: 'nock/nock', tag: 'v14.0.1' },
-  'got': { repo: 'sindresorhus/got', tag: 'v14.4.5' },
-  'mocha-pkg': { repo: 'mochajs/mocha', tag: 'v10.8.2' },
-  'tape-pkg': { repo: 'ljharb/tape', tag: 'v5.9.0' },
-  'jose': { repo: 'panva/jose', tag: 'v5.9.6' },
-  'bcryptjs': { repo: 'dcodeIO/bcrypt.js', tag: 'v2.4.3' },
-  'through2': { repo: 'rvagg/through2', tag: 'v4.0.2' },
-  'pump': { repo: 'mafintosh/pump', tag: 'v3.0.2' },
-  'jsdom': { repo: 'jsdom/jsdom', tag: '25.0.1' },
-  'execa': { repo: 'sindresorhus/execa', tag: 'v9.5.2' },
-};
+function npmViewString(pkgName: string, field: string): string | null {
+  let raw = '';
+  try {
+    raw = execSync(`npm view "${pkgName}" "${field}" --json`, {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      timeout: 60_000,
+    }).trim();
+  } catch {
+    return null;
+  }
+  if (!raw) {
+    return null;
+  }
+  const parsed = safeJsonParse<unknown>(raw);
+  if (typeof parsed === 'string') {
+    return parsed;
+  }
+  if (Array.isArray(parsed) && typeof parsed[0] === 'string') {
+    return parsed[0];
+  }
+  return raw.replace(/^"|"$/g, '');
+}
 
-/**
- * Install a package via git clone (in WSL for Linux semantics).
- */
-export function installPackage(name: string): { version: string; dir: string } {
-  const pkgDir = join(PACKAGES_DIR, name);
-  const wslPkgDir = toWslPath(pkgDir);
+function normalizeRepoUrl(raw: string | null): string | null {
+  if (!raw) return null;
+  let value = raw.trim().replace(/^git\+/, '').replace(/^git:\/\//, 'https://');
+  value = value.replace(/^git@github\.com:/, 'https://github.com/');
+  value = value.replace(/^ssh:\/\/git@github\.com\//, 'https://github.com/');
+  value = value.replace(/#.*$/, '');
+  if (!value.endsWith('.git')) {
+    value += '.git';
+  }
+  if (!/^https:\/\/github\.com\//i.test(value)) {
+    return null;
+  }
+  return value;
+}
 
+function readPackageJson(pkgDir: string): any | null {
+  const path = join(pkgDir, 'package.json');
+  if (!existsSync(path)) return null;
+  return safeJsonParse<any>(readFileSync(path, 'utf8'));
+}
+
+function getPackageDir(alias: string): string {
+  return join(PACKAGES_DIR, alias);
+}
+
+function ensurePackagesDir(): void {
   if (!existsSync(PACKAGES_DIR)) {
     mkdirSync(PACKAGES_DIR, { recursive: true });
   }
+}
 
-  if (!existsSync(join(pkgDir, 'package.json'))) {
-    const repoInfo = GIT_REPOS[name];
-    if (repoInfo) {
-      wslRun('clone', pkgDir, repoInfo.repo, repoInfo.tag, toWslPath(pkgDir));
+function readJsonFile<T>(path: string): T | null {
+  if (!existsSync(path)) return null;
+  return safeJsonParse<T>(readFileSync(path, 'utf8'));
+}
+
+function writeJsonFile(path: string, value: unknown): void {
+  writeFileSync(path, JSON.stringify(value, null, 2));
+}
+
+function getGitTags(repoUrl: string): Set<string> {
+  const output = execSync(`git ls-remote --tags --refs ${repoUrl}`, {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+    timeout: 120_000,
+  });
+  const tags = new Set<string>();
+  for (const line of output.split(/\r?\n/)) {
+    const match = line.match(/refs\/tags\/(.+)$/);
+    if (match) {
+      tags.add(match[1]);
     }
+  }
+  return tags;
+}
 
-    if (!existsSync(join(pkgDir, 'package.json'))) {
-      return { version: 'clone-failed', dir: pkgDir };
+function resolveGitRef(alias: string, npmName: string, version: string, repoUrl: string): string {
+  const tags = getGitTags(repoUrl);
+  const repoBase = repoUrl.replace(/^https:\/\/github\.com\//, '').replace(/\.git$/, '').split('/').pop() ?? alias;
+  const bareName = npmName.replace(/^@[^/]+\//, '');
+  const candidates = [
+    `v${version}`,
+    version,
+    `${npmName}@${version}`,
+    `${bareName}@${version}`,
+    `${alias}@${version}`,
+    `${repoBase}@${version}`,
+  ];
+  for (const candidate of candidates) {
+    if (tags.has(candidate)) {
+      return candidate;
     }
+  }
+  return 'HEAD';
+}
 
-    // npm install in WSL
-    wslRun('install', pkgDir);
+function resolvePackageSource(alias: string): ResolvedPackage {
+  const cached = RESOLUTION_CACHE.get(alias);
+  if (cached) return cached;
 
-    // Build step if needed
-    try {
-      const scripts = JSON.parse(readFileSync(join(pkgDir, 'package.json'), 'utf8')).scripts ?? {};
-      if (scripts.prepare || scripts.build || scripts.pretest) {
-        wslRun('build', pkgDir);
+  const npmName = NPM_NAME_OVERRIDES[alias] ?? alias;
+  const version = npmViewString(npmName, 'version');
+  if (!version) {
+    throw new Error(`Failed to resolve latest npm version for ${npmName}`);
+  }
+  const repoUrl =
+    REPO_URL_OVERRIDES[alias] ??
+    normalizeRepoUrl(npmViewString(npmName, 'repository.url'));
+  if (!repoUrl) {
+    throw new Error(`Failed to resolve GitHub repository for ${npmName}`);
+  }
+  const sourceRef = resolveGitRef(alias, npmName, version, repoUrl);
+  const resolved: ResolvedPackage = {
+    alias,
+    npmName,
+    version,
+    repoUrl,
+    source: sourceRef === 'HEAD' ? 'git-head' : 'git-tag',
+    sourceRef,
+    resolvedAt: new Date().toISOString(),
+  };
+  RESOLUTION_CACHE.set(alias, resolved);
+  return resolved;
+}
+
+function syncPackageSource(resolved: ResolvedPackage): { pkgDir: string; error?: string } {
+  ensurePackagesDir();
+  const pkgDir = getPackageDir(resolved.alias);
+  const sourceMeta = readJsonFile<{ repoUrl: string; sourceRef: string; version: string }>(
+    join(pkgDir, SOURCE_META_FILE),
+  );
+  const needsSync =
+    !existsSync(join(pkgDir, 'package.json')) ||
+    !sourceMeta ||
+    sourceMeta.repoUrl !== resolved.repoUrl ||
+    sourceMeta.sourceRef !== resolved.sourceRef ||
+    sourceMeta.version !== resolved.version;
+
+  if (needsSync) {
+    const sync = wslRun('sync', pkgDir, resolved.repoUrl, resolved.sourceRef);
+    if (sync.status !== 0) {
+      return { pkgDir, error: compactOutput(sync.stdout, sync.stderr) };
+    }
+    writeJsonFile(join(pkgDir, SOURCE_META_FILE), {
+      repoUrl: resolved.repoUrl,
+      sourceRef: resolved.sourceRef,
+      version: resolved.version,
+    });
+  }
+
+  return { pkgDir };
+}
+
+function extractWorkflowHints(pkgDir: string): WorkflowHints {
+  const workflowsDir = join(pkgDir, '.github', 'workflows');
+  const hints: WorkflowHints = { testCommands: [], installCommands: [] };
+  if (!existsSync(workflowsDir)) {
+    return hints;
+  }
+
+  for (const entry of readdirSync(workflowsDir)) {
+    if (!/\.ya?ml$/i.test(entry)) continue;
+    const content = readFileSync(join(workflowsDir, entry), 'utf8');
+    const lines = content.split(/\r?\n/);
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const single = line.match(/^\s*run:\s*(.+?)\s*$/);
+      if (single && single[1] !== '|') {
+        collectWorkflowCommand(single[1], hints);
+        continue;
       }
-    } catch {}
-  }
 
-  try {
-    const pkgJson = JSON.parse(readFileSync(join(pkgDir, 'package.json'), 'utf8'));
-    return { version: pkgJson.version ?? 'unknown', dir: pkgDir };
-  } catch {
-    return { version: 'unknown', dir: pkgDir };
-  }
-}
+      if (/^\s*run:\s*\|\s*$/.test(line)) {
+        const blockIndent = line.match(/^(\s*)/)?.[1].length ?? 0;
+        i++;
+        while (i < lines.length) {
+          const blockLine = lines[i];
+          const indent = blockLine.match(/^(\s*)/)?.[1].length ?? 0;
+          if (blockLine.trim() && indent <= blockIndent) {
+            i--;
+            break;
+          }
+          if (blockLine.trim()) {
+            collectWorkflowCommand(blockLine.trim(), hints);
+          }
+          i++;
+        }
+        continue;
+      }
 
-/**
- * Find the test command for a package.
- */
-export function findTestCommand(name: string, pkgDir: string): string | null {
-  if (TEST_CMD_OVERRIDES[name]) return TEST_CMD_OVERRIDES[name];
-
-  try {
-    const pkgJson = JSON.parse(readFileSync(join(pkgDir, 'package.json'), 'utf8'));
-    if (pkgJson.scripts?.test) {
-      let cmd = pkgJson.scripts.test;
-      if (/^echo\b|no test specified/.test(cmd)) return null;
-      cmd = cmd.replace(/^(nyc\s+|c8\s+|istanbul\s+cover\s+)/, '');
-      cmd = cmd.replace(/^npm run lint\s*&&\s*/, '');
-      cmd = cmd.replace(/^xo\s*&&\s*/, '');            // strip xo linter prefix
-      cmd = cmd.replace(/\s*&&\s*tsd\s*$/, '');         // strip tsd type checker suffix
-      return cmd;
+      const reusable = line.match(/^\s*npm-script:\s*(.+?)\s*$/);
+      if (reusable) {
+        collectWorkflowCommand(`npm run ${reusable[1].trim()}`, hints);
+      }
     }
-  } catch {}
+  }
 
-  if (existsSync(join(pkgDir, 'test'))) return 'mocha test --recursive --timeout 10000';
-  if (existsSync(join(pkgDir, 'tests'))) return 'mocha tests --recursive --timeout 10000';
-  return null;
+  return hints;
 }
 
-/** Classify error messages by Node API */
+function collectWorkflowCommand(command: string, hints: WorkflowHints): void {
+  const normalized = command.trim().replace(/^['"]|['"]$/g, '');
+  if (!normalized) return;
+  if (/(^|[;&|])\s*(npm|pnpm|yarn)\s+(ci|install)\b/.test(normalized)) {
+    hints.installCommands.push(normalized);
+  }
+  if (/(^|[;&|])\s*(npm|pnpm|yarn)\s+(run\s+)?test\b/.test(normalized)) {
+    hints.testCommands.push(normalized);
+  }
+}
+
+function selectInstallMode(pkgDir: string, runtimeCommand: string | null, hints: WorkflowHints): InstallMode {
+  const installText = hints.installCommands.join('\n');
+  if (/pnpm\s+install\b/.test(installText) || runtimeCommand?.startsWith('pnpm ')) {
+    return 'pnpm-install';
+  }
+  if (/yarn\s+install\b/.test(installText) || runtimeCommand?.startsWith('yarn ')) {
+    return 'yarn-install';
+  }
+  if (existsSync(join(pkgDir, 'package-lock.json')) || existsSync(join(pkgDir, 'npm-shrinkwrap.json'))) {
+    return 'npm-ci';
+  }
+  return 'npm-install';
+}
+
+function chooseRuntimeCommand(alias: string, pkgDir: string): { command: string | null; hints: WorkflowHints } {
+  if (COMMAND_OVERRIDES[alias]) {
+    return { command: COMMAND_OVERRIDES[alias], hints: { testCommands: [], installCommands: [] } };
+  }
+
+  const pkgJson = readPackageJson(pkgDir);
+  const hints = extractWorkflowHints(pkgDir);
+  const scripts = pkgJson?.scripts ?? {};
+
+  const exactMatches = [
+    /^npm test(?:\s|$)/,
+    /^npm run test(?:\s|$)/,
+    /^npm run test-node(?:\s|$)/,
+    /^npm run test:node(?:\s|$)/,
+    /^yarn test(?:\s|$)/,
+    /^pnpm test(?:\s|$)/,
+    /^pnpm run test(?:\s|$)/,
+  ];
+
+  for (const regex of exactMatches) {
+    const match = hints.testCommands.find(command => regex.test(command));
+    if (match) {
+      return { command: normalizeRuntimeCommand(match, scripts), hints };
+    }
+  }
+
+  if (typeof scripts.test === 'string' && !/no test specified|^echo\b/i.test(scripts.test)) {
+    return { command: 'npm test', hints };
+  }
+  if (typeof scripts['test-node'] === 'string') {
+    return { command: 'npm run test-node', hints };
+  }
+  if (typeof scripts['test:node'] === 'string') {
+    return { command: 'npm run test:node', hints };
+  }
+
+  return { command: null, hints };
+}
+
+function normalizeRuntimeCommand(command: string, scripts: Record<string, string>): string {
+  let value = command.trim();
+  const scriptInterpolation = value.match(/^npm run ([A-Za-z0-9:_-]+):\$\{\{/);
+  if (scriptInterpolation && typeof scripts[scriptInterpolation[1]] === 'string') {
+    value = `npm run ${scriptInterpolation[1]}`;
+  }
+  return value;
+}
+
+function installPackage(
+  pkgDir: string,
+  resolved: ResolvedPackage,
+  installMode: InstallMode,
+): { status: number; stdout: string; stderr: string; installMode: InstallMode } {
+  const installMeta = readJsonFile<{ installMode: InstallMode; version: string; sourceRef: string }>(
+    join(pkgDir, INSTALL_META_FILE),
+  );
+  if (
+    existsSync(join(pkgDir, 'node_modules')) &&
+    installMeta &&
+    installMeta.installMode === installMode &&
+    installMeta.version === resolved.version &&
+    installMeta.sourceRef === resolved.sourceRef
+  ) {
+    return { status: 0, stdout: 'Reusing existing node_modules', stderr: '', installMode };
+  }
+
+  let result = wslRun('install', pkgDir, installMode);
+  let finalMode = installMode;
+  if (result.status !== 0 && installMode === 'npm-ci') {
+    finalMode = 'npm-ci-legacy';
+    result = wslRun('install', pkgDir, finalMode);
+  } else if (result.status !== 0 && installMode === 'npm-install') {
+    finalMode = 'npm-install-legacy';
+    result = wslRun('install', pkgDir, finalMode);
+  }
+
+  if (result.status === 0) {
+    writeJsonFile(join(pkgDir, INSTALL_META_FILE), {
+      installMode: finalMode,
+      version: resolved.version,
+      sourceRef: resolved.sourceRef,
+    });
+  }
+
+  return { ...result, installMode: finalMode };
+}
+
+function classifyHarnessFailure(output: string): boolean {
+  return /command not found|Missing script:|ERR_PNPM_NO_IMPORTER_MANIFEST_FOUND|Usage Error: Couldn't find a script|corepack|No such file or directory/i
+    .test(output);
+}
+
 function classifyError(msg: string): string {
   if (/crypto|cipher|hash|hmac|sign|verify|random/i.test(msg)) return 'crypto';
   if (/ENOENT|EACCES|readFile|writeFile|stat|readdir|mkdir|unlink/i.test(msg)) return 'fs';
@@ -298,7 +456,6 @@ function classifyError(msg: string): string {
   return 'unknown';
 }
 
-/** Classify failure category */
 function classifyCategory(msg: string): FailureDetail['category'] {
   if (/listen|EADDRINUSE|server\.listen|createServer/i.test(msg)) return 'preview-adapter';
   if (/fork|spawn|exec|child_process/i.test(msg)) return 'browser-ceiling';
@@ -307,206 +464,342 @@ function classifyCategory(msg: string): FailureDetail['category'] {
   return 'compat-bug';
 }
 
-/**
- * Parse test output with actual error extraction.
- */
-export function parseTestOutput(stdout: string, stderr: string): {
-  total: number; passed: number; failed: number; skipped: number;
-  failures: Array<{ name: string; error: string }>;
-} {
-  const output = stdout + '\n' + stderr;
+export function parseTestOutput(stdout: string, stderr: string): ParseResult {
+  const output = `${stdout}\n${stderr}`;
   const failures: Array<{ name: string; error: string }> = [];
 
-  // Mocha: "N passing", "N failing"
   const mochaPass = output.match(/(\d+)\s+passing/);
-  const mochaFail = output.match(/(\d+)\s+failing/);
-  const mochaPend = output.match(/(\d+)\s+pending/);
   if (mochaPass) {
-    const passed = parseInt(mochaPass[1]);
-    const failed = mochaFail ? parseInt(mochaFail[1]) : 0;
-    const skipped = mochaPend ? parseInt(mochaPend[1]) : 0;
-    // Extract mocha failures: "  N) test name\n      ErrorType: message\n        at ..."
+    const passed = parseInt(mochaPass[1], 10);
+    const failed = parseInt(output.match(/(\d+)\s+failing/)?.[1] ?? '0', 10);
+    const skipped = parseInt(output.match(/(\d+)\s+pending/)?.[1] ?? '0', 10);
     const failRegex = /^\s+(\d+)\)\s+(.+)$/gm;
-    let failMatch;
-    while ((failMatch = failRegex.exec(output)) !== null) {
-      const testName = failMatch[2].trim();
-      // Look for error message on the next indented line(s)
-      const afterIdx = failMatch.index + failMatch[0].length;
-      const afterText = output.substring(afterIdx, afterIdx + 500);
-      const errLine = afterText.match(/\n\s{4,}(\S.+)/);
-      failures.push({ name: testName, error: errLine ? errLine[1].trim() : '' });
+    let match: RegExpExecArray | null;
+    while ((match = failRegex.exec(output)) !== null) {
+      const after = output.slice(match.index + match[0].length, match.index + match[0].length + 400);
+      failures.push({
+        name: match[2].trim(),
+        error: after.match(/\n\s{4,}(\S.+)/)?.[1]?.trim() ?? '',
+      });
     }
-    return { total: passed + failed + skipped, passed, failed, skipped, failures };
+    return { total: passed + failed + skipped, passed, failed, skipped, countAvailable: true, failures };
   }
 
-  // Jest: "Tests: N failed, N skipped, N passed, N total"
   const jestMatch = output.match(/Tests:\s+(?:(\d+)\s+failed,\s+)?(?:(\d+)\s+skipped,\s+)?(\d+)\s+passed,\s+(\d+)\s+total/);
   if (jestMatch) {
     return {
-      total: parseInt(jestMatch[4]),
-      passed: parseInt(jestMatch[3]),
-      failed: parseInt(jestMatch[1] ?? '0'),
-      skipped: parseInt(jestMatch[2] ?? '0'),
+      total: parseInt(jestMatch[4], 10),
+      passed: parseInt(jestMatch[3], 10),
+      failed: parseInt(jestMatch[1] ?? '0', 10),
+      skipped: parseInt(jestMatch[2] ?? '0', 10),
+      countAvailable: true,
       failures,
     };
   }
 
-  // TAP: "1..N"
-  const tapPlan = output.match(/^1\.\.(\d+)\s*$/m);
-  if (tapPlan) {
-    const total = parseInt(tapPlan[1]);
-    const okLines = output.match(/^ok \d+/gm) ?? [];
-    const notOkLines = output.match(/^not ok \d+.*/gm) ?? [];
-    for (const line of notOkLines) {
-      const name = line.replace(/^not ok \d+\s*-?\s*/, '').trim();
-      // Look for error in next lines
+  const topLevelPlan = output.match(/^1\.\.(\d+)\s*$/m);
+  const topLevelOk = output.match(/^ok \d+(?:\s+-\s+.*)?$/gm) ?? [];
+  const topLevelNotOk = output.match(/^not ok \d+(?:\s+-\s+.*)?$/gm) ?? [];
+  if (topLevelPlan || topLevelOk.length || topLevelNotOk.length) {
+    for (const line of topLevelNotOk) {
       const idx = output.indexOf(line);
-      const after = output.substring(idx + line.length, idx + line.length + 500);
-      const errMatch = after.match(/(?:message|Error|operator|expected|actual):\s*(.+)/);
-      failures.push({ name, error: errMatch?.[1]?.trim() ?? '' });
+      const after = output.slice(idx + line.length, idx + line.length + 500);
+      failures.push({
+        name: line.replace(/^not ok \d+\s*-?\s*/, '').trim(),
+        error: after.match(/(?:message|Error|operator|expected|actual):\s*(.+)/)?.[1]?.trim() ?? '',
+      });
     }
-    return { total, passed: okLines.length, failed: notOkLines.length, skipped: total - okLines.length - notOkLines.length, failures };
+    const total = topLevelPlan ? parseInt(topLevelPlan[1], 10) : topLevelOk.length + topLevelNotOk.length;
+    const skipped = Math.max(0, total - topLevelOk.length - topLevelNotOk.length);
+    return {
+      total,
+      passed: topLevelOk.length,
+      failed: topLevelNotOk.length,
+      skipped,
+      countAvailable: true,
+      failures,
+    };
   }
 
-  // TAP summary: "# tests N", "# pass N", "# fail N"
   const tapTests = output.match(/# tests\s+(\d+)/);
   const tapPass = output.match(/# pass\s+(\d+)/);
   const tapFail = output.match(/# fail\s+(\d+)/);
-  if (tapTests || tapPass) {
-    return {
-      total: tapTests ? parseInt(tapTests[1]) : 0,
-      passed: tapPass ? parseInt(tapPass[1]) : 0,
-      failed: tapFail ? parseInt(tapFail[1]) : 0,
-      skipped: 0, failures,
-    };
+  if (tapTests || tapPass || tapFail) {
+    const passed = parseInt(tapPass?.[1] ?? '0', 10);
+    const failed = parseInt(tapFail?.[1] ?? '0', 10);
+    const total = parseInt(tapTests?.[1] ?? String(passed + failed), 10);
+    return { total, passed, failed, skipped: Math.max(0, total - passed - failed), countAvailable: true, failures };
   }
 
-  // node:test: "# pass N", "# fail N"
   const nodePass = output.match(/# pass (\d+)/);
   const nodeFail = output.match(/# fail (\d+)/);
-  if (nodePass) {
-    const passed = parseInt(nodePass[1]);
-    const failed = nodeFail ? parseInt(nodeFail[1]) : 0;
-    return { total: passed + failed, passed, failed, skipped: 0, failures };
+  if (nodePass || nodeFail) {
+    const passed = parseInt(nodePass?.[1] ?? '0', 10);
+    const failed = parseInt(nodeFail?.[1] ?? '0', 10);
+    return { total: passed + failed, passed, failed, skipped: 0, countAvailable: true, failures };
   }
 
-  // Ava: "N tests passed"
   const avaPass = output.match(/(\d+)\s+tests?\s+passed/);
   const avaFail = output.match(/(\d+)\s+tests?\s+failed/);
-  if (avaPass) {
+  if (avaPass || avaFail) {
+    const passed = parseInt(avaPass?.[1] ?? '0', 10);
+    const failed = parseInt(avaFail?.[1] ?? '0', 10);
+    return { total: passed + failed, passed, failed, skipped: 0, countAvailable: true, failures };
+  }
+
+  const vitest = output.match(/Tests\s+(\d+)\s+passed(?:\s+\|\s+(\d+)\s+failed)?(?:\s+\|\s+(\d+)\s+skipped)?/);
+  if (vitest) {
+    const passed = parseInt(vitest[1], 10);
+    const failed = parseInt(vitest[2] ?? '0', 10);
+    const skipped = parseInt(vitest[3] ?? '0', 10);
+    return { total: passed + failed + skipped, passed, failed, skipped, countAvailable: true, failures };
+  }
+
+  return { total: 0, passed: 0, failed: 0, skipped: 0, countAvailable: false, failures };
+}
+
+function compactOutput(stdout: string, stderr: string): string {
+  const text = `${stdout}\n${stderr}`
+    .replace(/\r/g, '')
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)
+    .slice(-20)
+    .join(' | ');
+  return text.slice(0, 1200);
+}
+
+export async function runPackageTests(alias: string, tier: number): Promise<PackageResult> {
+  console.log(`\n[${alias}] resolving source`);
+
+  let resolved: ResolvedPackage;
+  try {
+    resolved = resolvePackageSource(alias);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     return {
-      total: parseInt(avaPass[1]) + (avaFail ? parseInt(avaFail[1]) : 0),
-      passed: parseInt(avaPass[1]),
-      failed: avaFail ? parseInt(avaFail[1]) : 0,
-      skipped: 0, failures,
+      package: alias,
+      npmName: NPM_NAME_OVERRIDES[alias] ?? alias,
+      version: 'unknown',
+      tier,
+      status: 'harness-fail',
+      total: 0,
+      passed: 0,
+      failed: 0,
+      skipped: 0,
+      rate: 'N/A',
+      countAvailable: false,
+      failures: [],
+      error: message,
     };
   }
 
-  // Generic checkmarks
-  const checks = (output.match(/✓|✔/g) ?? []).length;
-  const crosses = (output.match(/✗|✘/g) ?? []).length;
-  if (checks > 0 || crosses > 0) {
-    return { total: checks + crosses, passed: checks, failed: crosses, skipped: 0, failures };
+  const synced = syncPackageSource(resolved);
+  if (synced.error) {
+    return {
+      package: alias,
+      npmName: resolved.npmName,
+      version: resolved.version,
+      tier,
+      status: 'harness-fail',
+      total: 0,
+      passed: 0,
+      failed: 0,
+      skipped: 0,
+      rate: 'N/A',
+      countAvailable: false,
+      failures: [],
+      source: resolved.source,
+      sourceRef: resolved.sourceRef,
+      resolvedAt: resolved.resolvedAt,
+      error: synced.error,
+    };
   }
 
-  // Bare ok/not ok (tape without plan)
-  const bareOk = (output.match(/^ok \d+/gm) ?? []).length;
-  const bareNotOk = (output.match(/^not ok \d+/gm) ?? []).length;
-  if (bareOk > 0 || bareNotOk > 0) {
-    for (const line of (output.match(/^not ok \d+.*/gm) ?? [])) {
-      failures.push({ name: line.trim(), error: '' });
-    }
-    return { total: bareOk + bareNotOk, passed: bareOk, failed: bareNotOk, skipped: 0, failures };
+  const { command, hints } = chooseRuntimeCommand(alias, synced.pkgDir);
+  if (!command) {
+    return {
+      package: alias,
+      npmName: resolved.npmName,
+      version: resolved.version,
+      tier,
+      status: 'no-runtime-test',
+      total: 0,
+      passed: 0,
+      failed: 0,
+      skipped: 0,
+      rate: 'N/A',
+      countAvailable: false,
+      failures: [],
+      source: resolved.source,
+      sourceRef: resolved.sourceRef,
+      resolvedAt: resolved.resolvedAt,
+      error: 'No upstream runtime test command found',
+    };
   }
 
-  return { total: 0, passed: 0, failed: 0, skipped: 0, failures };
-}
-
-/**
- * Run a package's test suite in WSL.
- */
-export async function runPackageTests(name: string, tier: number): Promise<PackageResult> {
-  console.log(`\n[${name}] Installing...`);
-  const { version, dir } = installPackage(name);
-
-  if (version === 'clone-failed' || version === 'install-failed') {
-    return { package: name, version, tier, total: 0, passed: 0, failed: 0, skipped: 0, rate: '0%', failures: [], error: 'Install failed' };
+  const installMode = selectInstallMode(synced.pkgDir, command, hints);
+  console.log(`[${alias}@${resolved.version}] install ${installMode}`);
+  const install = installPackage(synced.pkgDir, resolved, installMode);
+  if (install.status !== 0) {
+    return {
+      package: alias,
+      npmName: resolved.npmName,
+      version: resolved.version,
+      tier,
+      status: 'harness-fail',
+      total: 0,
+      passed: 0,
+      failed: 0,
+      skipped: 0,
+      rate: 'N/A',
+      countAvailable: false,
+      failures: [],
+      command,
+      installMode: install.installMode,
+      source: resolved.source,
+      sourceRef: resolved.sourceRef,
+      resolvedAt: resolved.resolvedAt,
+      error: compactOutput(install.stdout, install.stderr),
+    };
   }
 
-  const testCmd = findTestCommand(name, dir);
-  if (!testCmd) {
-    return { package: name, version, tier, total: 0, passed: 0, failed: 0, skipped: 0, rate: 'N/A', failures: [], error: 'No test command' };
-  }
-
-  console.log(`[${name}@${version}] Running: ${testCmd}`);
-
-  // Run test command in WSL
-  const { stdout, stderr, status } = wslRun('test', dir, testCmd);
-  const parsed = parseTestOutput(stdout, stderr);
-
-  // Exit-code fallback: raw-assert packages produce no parseable output
-  // but exit 0 on success. Count as 1 pass.
-  if (parsed.total === 0 && status === 0 && stdout.length > 0) {
-    parsed.total = 1;
-    parsed.passed = 1;
-  }
-  // Rate = passed/(passed+failed) — skipped tests don't penalize
+  console.log(`[${alias}@${resolved.version}] test ${command}`);
+  const test = wslRun('test', synced.pkgDir, command);
+  const parsed = parseTestOutput(test.stdout, test.stderr);
   const executed = parsed.passed + parsed.failed;
-  const rate = executed > 0 ? `${Math.round((parsed.passed / executed) * 100)}%` : '0%';
+  const rate = executed > 0 ? `${Math.round((parsed.passed / executed) * 100)}%` : test.status === 0 ? '100%' : '0%';
+  const output = compactOutput(test.stdout, test.stderr);
+  const status: PackageStatus =
+    test.status === 0 ? 'pass' : classifyHarnessFailure(output) ? 'harness-fail' : 'runtime-fail';
 
-  const failures: FailureDetail[] = parsed.failures.map(f => ({
-    testName: f.name,
-    errorMessage: f.error,
-    nodeApi: classifyError(f.name + ' ' + f.error),
-    category: classifyCategory(f.name + ' ' + f.error),
+  const failures: FailureDetail[] = parsed.failures.map(failure => ({
+    testName: failure.name,
+    errorMessage: failure.error,
+    nodeApi: classifyError(`${failure.name} ${failure.error}`),
+    category: classifyCategory(`${failure.name} ${failure.error}`),
   }));
 
-  console.log(`[${name}] ${parsed.passed}/${parsed.total} passed (${rate})`);
-
-  return { package: name, version, tier, total: parsed.total, passed: parsed.passed, failed: parsed.failed, skipped: parsed.skipped, rate, failures };
+  return {
+    package: alias,
+    npmName: resolved.npmName,
+    version: resolved.version,
+    tier,
+    status,
+    total: parsed.total,
+    passed: parsed.passed,
+    failed: parsed.failed,
+    skipped: parsed.skipped,
+    rate,
+    countAvailable: parsed.countAvailable,
+    failures,
+    command,
+    exitCode: test.status,
+    installMode: install.installMode,
+    source: resolved.source,
+    sourceRef: resolved.sourceRef,
+    resolvedAt: resolved.resolvedAt,
+    error: test.status === 0 ? undefined : output,
+  };
 }
 
-/**
- * Generate RESULTS.md from test results.
- */
+function aggregateCounts(results: PackageResult[]): { total: number; passed: number; failed: number; skipped: number } {
+  const counted = results.filter(result => result.countAvailable);
+  return counted.reduce(
+    (acc, result) => ({
+      total: acc.total + result.total,
+      passed: acc.passed + result.passed,
+      failed: acc.failed + result.failed,
+      skipped: acc.skipped + result.skipped,
+    }),
+    { total: 0, passed: 0, failed: 0, skipped: 0 },
+  );
+}
+
+function renderResultTable(results: PackageResult[]): string {
+  let md = '| Package | npm | Version | Status | Total | Passed | Failed | Skipped | Rate | Counted | Tier |\n';
+  md += '|---------|-----|---------|--------|-------|--------|--------|---------|------|---------|------|\n';
+  for (const result of results) {
+    md += `| ${result.package} | ${result.npmName} | ${result.version} | ${result.status} | ${result.total || '-'} | ${result.passed || '-'} | ${result.failed || '-'} | ${result.skipped || '-'} | ${result.rate} | ${result.countAvailable ? 'yes' : 'no'} | ${result.tier} |\n`;
+  }
+  return md;
+}
+
 export function generateResultsMd(results: PackageResult[]): string {
+  const statuses = ['pass', 'runtime-fail', 'harness-fail', 'no-runtime-test'] as const;
   let md = '# Package Compatibility Matrix\n\n';
   md += `Generated: ${new Date().toISOString()}\n\n`;
-
-  md += '| Package | Version | Total | Passed | Failed | Skipped | Rate | Tier |\n';
-  md += '|---------|---------|-------|--------|--------|---------|------|------|\n';
-
-  for (const r of results) {
-    md += `| ${r.package} | ${r.version} | ${r.total} | ${r.passed} | ${r.failed} | ${r.skipped} | ${r.rate} | ${r.tier} |\n`;
+  md += '## Status Summary\n\n';
+  for (const status of statuses) {
+    md += `- ${status}: ${results.filter(result => result.status === status).length}\n`;
   }
+  const counts = aggregateCounts(results);
+  md += `- counted tests: ${counts.passed}/${counts.total} passed, ${counts.failed} failed, ${counts.skipped} skipped\n\n`;
 
+  md += '## Results\n\n';
+  md += renderResultTable(results);
+
+  md += '\n## Tier Summaries\n\n';
   for (const tier of [1, 2, 3, 4]) {
-    const tr = results.filter(r => r.tier === tier);
-    const tt = tr.reduce((s, r) => s + r.total, 0);
-    const tp = tr.reduce((s, r) => s + r.passed, 0);
-    const tf = tr.reduce((s, r) => s + r.failed, 0);
-    const ts = tr.reduce((s, r) => s + r.skipped, 0);
-    const executed = tp + tf;
-    const rate = executed > 0 ? `${Math.round((tp / executed) * 100)}%` : 'N/A';
-    md += `| **Tier ${tier} Total** | | **${tt}** | **${tp}** | **${tf}** | **${ts}** | **${rate}** | **${tier}** |\n`;
+    const tierResults = results.filter(result => result.tier === tier);
+    const tierCounts = aggregateCounts(tierResults);
+    md += `- Tier ${tier}: ${tierResults.filter(result => result.status === 'pass').length}/${tierResults.length} packages passing, counted tests ${tierCounts.passed}/${tierCounts.total}\n`;
   }
 
-  const allFailures = results.flatMap(r => r.failures.map(f => ({ ...f, pkg: r.package })));
-  if (allFailures.length > 0) {
-    md += '\n## Failures\n\n';
-    md += '| Package | Test | Error | Node API | Category |\n';
-    md += '|---------|------|-------|----------|----------|\n';
-    for (const f of allFailures) {
-      const err = (f.errorMessage || '-').replace(/\|/g, '\\|').substring(0, 100);
-      md += `| ${f.pkg} | ${f.testName.substring(0, 60)} | ${err} | ${f.nodeApi} | ${f.category} |\n`;
+  const runtimeFailures = results.filter(result => result.status === 'runtime-fail');
+  if (runtimeFailures.length) {
+    md += '\n## Runtime Failures\n\n';
+    for (const result of runtimeFailures) {
+      md += `- **${result.package}** (${result.version}) via \`${result.command ?? 'unknown'}\`: ${result.error ?? 'No error captured'}\n`;
     }
   }
 
-  const errors = results.filter(r => r.error);
-  if (errors.length > 0) {
-    md += '\n## Errors\n\n';
-    for (const r of errors) md += `- **${r.package}**: ${r.error}\n`;
+  const harnessFailures = results.filter(result => result.status === 'harness-fail');
+  if (harnessFailures.length) {
+    md += '\n## Harness Failures\n\n';
+    for (const result of harnessFailures) {
+      md += `- **${result.package}** (${result.version}) via \`${result.command ?? 'n/a'}\`: ${result.error ?? 'No error captured'}\n`;
+    }
+  }
+
+  const noRuntimeTests = results.filter(result => result.status === 'no-runtime-test');
+  if (noRuntimeTests.length) {
+    md += '\n## No Runtime Test Command\n\n';
+    for (const result of noRuntimeTests) {
+      md += `- **${result.package}** (${result.version})\n`;
+    }
+  }
+
+  const allFailures = results.flatMap(result => result.failures.map(failure => ({ package: result.package, failure })));
+  if (allFailures.length) {
+    md += '\n## Failure Details\n\n';
+    md += '| Package | Test | Error | Node API | Category |\n';
+    md += '|---------|------|-------|----------|----------|\n';
+    for (const entry of allFailures) {
+      const error = (entry.failure.errorMessage || '-').replace(/\|/g, '\\|').slice(0, 140);
+      md += `| ${entry.package} | ${entry.failure.testName.replace(/\|/g, '\\|').slice(0, 80)} | ${error} | ${entry.failure.nodeApi} | ${entry.failure.category} |\n`;
+    }
   }
 
   return md;
+}
+
+export function generateResolvedPackagesJson(results: PackageResult[]): string {
+  return JSON.stringify(
+    results.map(result => ({
+      package: result.package,
+      npmName: result.npmName,
+      version: result.version,
+      status: result.status,
+      source: result.source,
+      sourceRef: result.sourceRef,
+      resolvedAt: result.resolvedAt,
+      command: result.command,
+      installMode: result.installMode,
+      countAvailable: result.countAvailable,
+      exitCode: result.exitCode,
+    })),
+    null,
+    2,
+  );
 }

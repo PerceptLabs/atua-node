@@ -230,3 +230,5 @@ export const process = {
   // EventLoop access (for internal use)
   _eventLoop,
 };
+
+export default process;

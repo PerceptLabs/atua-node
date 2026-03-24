@@ -24,22 +24,23 @@ describe('ModuleRouter', () => {
     populateRegistry(router);
   });
 
-  it('should resolve unenv modules to baseImpl', () => {
-    const result = router.resolve('path') as { notImplemented: boolean; moduleName: string };
-    expect(result.notImplemented).toBe(true);
-    expect(result.moduleName).toBe('path');
+  it('should resolve unenv modules to vendor implementation', () => {
+    const result = router.resolve('path') as Record<string, unknown>;
+    expect(typeof result.join).toBe('function');
+    expect(typeof result.resolve).toBe('function');
+    expect(typeof result.dirname).toBe('function');
   });
 
-  it('should resolve vendored-js modules to baseImpl', () => {
-    const result = router.resolve('stream') as { notImplemented: boolean; moduleName: string };
-    expect(result.notImplemented).toBe(true);
-    expect(result.moduleName).toBe('stream');
+  it('should resolve vendored-js modules to vendor implementation', () => {
+    const result = router.resolve('stream') as Record<string, unknown>;
+    expect(typeof result.Readable).toBe('function');
+    expect(typeof result.Writable).toBe('function');
   });
 
   it('should resolve wasix modules to baseImpl when wasmer is not ready', () => {
-    const result = router.resolve('crypto') as { notImplemented: boolean; moduleName: string };
-    expect(result.notImplemented).toBe(true);
-    expect(result.moduleName).toBe('crypto');
+    const result = router.resolve('crypto') as Record<string, unknown>;
+    expect(typeof result.createHash).toBe('function');
+    expect(typeof result.randomBytes).toBe('function');
   });
 
   it('should resolve wasix modules to wasixImpl when wasmer is ready and loaded', async () => {
@@ -62,10 +63,10 @@ describe('ModuleRouter', () => {
     expect(result.moduleName).toBe('crypto');
   });
 
-  it('should throw for wasix-required modules when wasmer is not ready', () => {
-    expect(() => router.resolve('vm')).toThrow(
-      "Module 'vm' requires WASIX"
-    );
+  it('should resolve wasix-required modules to vendor baseImpl when wasmer is not ready', () => {
+    const result = router.resolve('vm') as Record<string, unknown>;
+    expect(typeof result.runInNewContext).toBe('function');
+    expect(typeof result.createContext).toBe('function');
   });
 
   it('should resolve wasix-required modules when wasmer is ready and loaded', async () => {

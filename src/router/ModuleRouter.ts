@@ -54,9 +54,9 @@ export class ModuleRouter {
         if (this._initializer.isReady && entry.loaded && entry.wasixImpl) {
           return entry.wasixImpl();
         }
-        throw new Error(
-          `Module '${moduleName}' requires WASIX. Ensure COOP/COEP headers (Cross-Origin-Opener-Policy: same-origin, Cross-Origin-Embedder-Policy: require-corp) are set on your server.`
-        );
+        // Fall back to vendor baseImpl — module loads with full API surface,
+        // individual functions throw if they need WASIX (Deno pattern).
+        return entry.baseImpl();
     }
   }
 

@@ -207,7 +207,7 @@ describe('Regression: Epic Brief gap tests', () => {
   });
 
   // ── Gap 10: Graceful degradation ──────────────────────────
-  it('10. wasix-required modules fail descriptively when WASM unavailable', async () => {
+  it('10. wasix-required modules return vendor baseImpl when WASM unavailable', async () => {
     const { WasmerInitializer } = await import('../../src/wasmer/WasmerInitializer.js');
     const { ModuleRouter } = await import('../../src/router/ModuleRouter.js');
     const { populateRegistry } = await import('../../src/router/registry.js');
@@ -216,10 +216,18 @@ describe('Regression: Epic Brief gap tests', () => {
     const router = new ModuleRouter(init);
     populateRegistry(router);
 
-    // wasix-required modules should throw with descriptive message
-    expect(() => router.resolve('vm')).toThrow('requires WASIX');
-    expect(() => router.resolve('child_process')).toThrow('requires WASIX');
-    expect(() => router.resolve('worker_threads')).toThrow('requires WASIX');
-    expect(() => router.resolve('cluster')).toThrow('requires WASIX');
+    // wasix-required modules should return vendor baseImpl with full API surface
+    // (individual functions throw if they need WASIX, but the module loads)
+    const vm = router.resolve('vm') as Record<string, unknown>;
+    expect(typeof vm.runInNewContext).toBe('function');
+
+    const cp = router.resolve('child_process') as Record<string, unknown>;
+    expect(typeof cp.spawn).toBe('function');
+
+    const wt = router.resolve('worker_threads') as Record<string, unknown>;
+    expect(typeof wt.Worker).toBe('function');
+
+    const cluster = router.resolve('cluster') as Record<string, unknown>;
+    expect(typeof cluster.fork).toBe('function');
   });
 });
